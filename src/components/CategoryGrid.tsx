@@ -1,0 +1,53 @@
+import { useCategories } from "@/hooks/use-products";
+import { Loader2 } from "lucide-react";
+
+interface CategoryGridProps {
+  onCategoryClick: (categorySlug: string) => void;
+  activeCategory?: string;
+}
+
+const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) => {
+  const { data: categories, isLoading } = useCategories();
+
+  if (isLoading) {
+    return (
+      <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10 flex justify-center py-10">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </section>
+    );
+  }
+
+  return (
+    <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
+      <div className="mb-5">
+        <span className="text-[10px] font-bold text-accent tracking-widest uppercase">Categories</span>
+        <h2 className="font-heading text-xl font-bold mt-0.5">Health Ecosystem</h2>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {(categories ?? []).map((cat, i) => (
+          <button
+            key={cat.id}
+            onClick={() => onCategoryClick(cat.slug)}
+            className={`group p-4 rounded-2xl border transition-all duration-200 text-left animate-fade-in hover:shadow-glow ${
+              activeCategory === cat.slug
+                ? "gradient-primary text-primary-foreground border-transparent"
+                : "glass-card border-border/50 hover:border-primary/30"
+            }`}
+            style={{ animationDelay: `${i * 50}ms` }}
+          >
+            <span className="text-2xl mb-2 block">{cat.icon}</span>
+            <h3 className="font-heading font-bold text-sm leading-tight">{cat.name}</h3>
+            <p className={`text-[11px] mt-1 leading-snug ${
+              activeCategory === cat.slug ? "text-primary-foreground/80" : "text-muted-foreground"
+            }`}>
+              {cat.description}
+            </p>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+export default CategoryGrid;
