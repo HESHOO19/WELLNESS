@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,19 +77,24 @@ const SupplierDashboard = () => {
     enabled: !!user && isSupplier,
   });
 
-  const { data: myOrders } = useQuery({
+  const { data: myOrders, error: ordersError } = useQuery({
     queryKey: ["supplier-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
         .select("*, order_items!inner(*, products!inner(name, supplier_id, image_url))")
-        .eq("order_items.products.supplier_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SupplierOrder[];
     },
     enabled: !!user && isSupplier,
   });
+
+  useEffect(() => {
+    if (!ordersError) return;
+    const message = ordersError instanceof Error ? ordersError.message : "Unable to load orders.";
+    toast({ title: "Unable to load orders", description: message, variant: "destructive" });
+  }, [ordersError, toast]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
