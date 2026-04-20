@@ -15,7 +15,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Store, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/contexts/AuthContext";
 import logo from "@/assets/wellness_logo.svg";
 
@@ -37,6 +36,14 @@ const Auth = () => {
   const [showAccountTypeModal, setShowAccountTypeModal] = useState(false);
   const [googleAccountType, setGoogleAccountType] = useState<"buyer" | "supplier">("buyer");
   const [savingAccountType, setSavingAccountType] = useState(false);
+
+  useEffect(() => {
+    if (!showAccountTypeModal) return;
+    const preferred = localStorage.getItem("preferred_account_type");
+    if (preferred === "supplier" || preferred === "buyer") {
+      setGoogleAccountType(preferred);
+    }
+  }, [showAccountTypeModal]);
 
   useEffect(() => {
     if (!user) return;
@@ -99,16 +106,24 @@ const Auth = () => {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/callback`,
+    localStorage.setItem("preferred_account_type", registrationAccountType);
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        skipBrowserRedirect: true,
+      },
     });
-    if (result.error) {
-      toast({ title: "Google sign in failed", description: String(result.error), variant: "destructive" });
+    if (error) {
+      toast({ title: "Google sign in failed", description: error.message, variant: "destructive" });
       setLoading(false);
       return;
     }
-    if (result.redirected) return;
-    navigate("/");
+    if (data?.url) {
+      window.location.assign(data.url);
+      return;
+    }
+    setLoading(false);
   };
 
   // Saves the account type chosen after Google OAuth for new users
@@ -131,6 +146,7 @@ const Auth = () => {
 
       toast({ title: "Account type saved", description: `Registered as ${googleAccountType}.` });
       setShowAccountTypeModal(false);
+      localStorage.removeItem("preferred_account_type");
       navigate(googleAccountType === "supplier" ? "/supplier" : "/orders");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unable to save account type.";
