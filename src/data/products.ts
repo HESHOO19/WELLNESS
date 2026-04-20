@@ -1,5 +1,6 @@
 import { Product, Category } from "@/types";
 
+// Demo/Seed Data: useful for local development or initial seeding only.
 export const categories: Category[] = [
   { id: "vitals", name: "Vital Medications", icon: "💊", description: "Essential prescription medications" },
   { id: "vitamins", name: "Vitamins & Supplements", icon: "🥗", description: "Nutritional supplements" },
@@ -9,6 +10,7 @@ export const categories: Category[] = [
   { id: "hygiene", name: "Hygiene & Sanitizers", icon: "🧴", description: "Cleaning and hygiene supplies" },
 ];
 
+// Demo/Seed Data: fallback products for local development.
 export const products: Product[] = [
   { id: "v1", name: "Vitamin D3 5000IU", description: "Immunity & bone health support. Premium quality.", price: 245, category: "vitamins", image_url: "https://lh3.googleusercontent.com/aida-public/AB6AXuCosbykm4PoTRs0bzMgM8_dFkhGYAnYmjNVk9w-zlf3QB8KwN_AjXIxY_H07-l1GMPbsbbCT2KL3U3vpWQyNSXuzuVNaYsaZi0kBIUHvMo-4UA1llfISQ7kP0iQIew9JeugH_owqBj5ci8LylIWfe1ZT0Td8aybArR4f7AespFT11qGVjBkLE7UmVmqkLu09Wc9LxLJyUVqAkJ_uyWSisKmHd9-k60owYz3jvJ_PL-BZBZVak9tvG7jYyNzSglNTZz0lpyuEwh2KwuX", stock: 500, unit: "bottle", min_order: 10 },
   { id: "c1", name: "Hydrating Serum", description: "Pure hyaluronic acid formula for deep hydration.", price: 890, category: "cosmetics", image_url: "https://lh3.googleusercontent.com/aida-public/AB6AXuD0OK4B5AEBIj28HqhiYGimyunHBtWQnx0Cf98dUrKz-mI5_A1CXenr-q0Y5Oxhg0nnBRTIRL7a0ja5INsJzFr3capUM2BShnR-6V7kHpgNB4kGqwEYK0P8hhJxWqOqe1L-zDsJozryc5ZlSavH_v0UnidjkV-M3pEjV_sq-gW9SpJXCZb0CiFeRqrGgF7xo7fpcrDTb7cqJqhz1D7TOt9g2-4zxTuTApWsF1y_Kt2MtRXzZcsGsglcFvCIXLOwOgGeVxQZZ44EXjBo", stock: 200, unit: "box", min_order: 5 },

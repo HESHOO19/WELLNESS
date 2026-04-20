@@ -50,8 +50,9 @@ const Checkout = () => {
       });
       clearCart();
       navigate("/");
-    } catch (err: any) {
-      toast({ title: "Order failed", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Order failed.";
+      toast({ title: "Order failed", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -122,6 +123,7 @@ const Checkout = () => {
                   <div>
                     <p className="font-bold text-sm">Pay Online</p>
                     <p className="text-muted-foreground text-xs">Secure card payment</p>
+                    <p className="text-muted-foreground text-[11px]">Demo mode — no real charge yet</p>
                   </div>
                 </label>
                 <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === "cod" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>

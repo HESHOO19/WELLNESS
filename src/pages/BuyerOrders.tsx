@@ -7,8 +7,22 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Package, Loader2, ShoppingBag, Truck, CheckCircle2, Clock } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
-const statusMeta: Record<string, { label: string; icon: any; cls: string }> = {
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
+type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
+
+type BuyerOrderItem = OrderItemRow & {
+  products: Pick<ProductRow, "name" | "image_url"> | null;
+};
+
+type BuyerOrder = OrderRow & {
+  order_items: BuyerOrderItem[];
+};
+
+const statusMeta: Record<string, { label: string; icon: LucideIcon; cls: string }> = {
   pending: { label: "Pending", icon: Clock, cls: "bg-yellow-500/10 text-yellow-600" },
   confirmed: { label: "Confirmed", icon: CheckCircle2, cls: "bg-blue-500/10 text-blue-600" },
   shipped: { label: "Shipped", icon: Truck, cls: "bg-purple-500/10 text-purple-600" },
@@ -20,7 +34,7 @@ const BuyerOrders = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  const { data: orders, isLoading } = useQuery({
+  const { data: orders, isLoading } = useQuery<BuyerOrder[]>({
     queryKey: ["buyer-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -29,7 +43,7 @@ const BuyerOrders = () => {
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as BuyerOrder[];
     },
     enabled: !!user,
   });
@@ -80,7 +94,7 @@ const BuyerOrders = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {orders.map((order: any) => {
+            {orders.map((order) => {
               const meta = statusMeta[order.status] ?? statusMeta.pending;
               const Icon = meta.icon;
               return (
@@ -102,7 +116,7 @@ const BuyerOrders = () => {
                     <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
                   </div>
                   <div className="space-y-2 border-t border-border pt-3">
-                    {order.order_items.map((oi: any) => (
+                    {order.order_items.map((oi) => (
                       <div key={oi.id} className="flex items-center gap-3 text-sm">
                         <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
                           {oi.products?.image_url ? (

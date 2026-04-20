@@ -17,6 +17,17 @@ const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) =>
     );
   }
 
+  if (!categories || categories.length === 0) {
+    return (
+      <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-lg font-heading font-bold">No categories available</p>
+          <p className="text-sm mt-1">Check back soon as new suppliers join the marketplace.</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
       <div className="mb-5">
@@ -25,7 +36,7 @@ const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) =>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {(categories ?? []).map((cat, i) => (
+        {categories.map((cat, i) => (
           <button
             key={cat.id}
             onClick={() => onCategoryClick(cat.slug)}

@@ -110,20 +110,25 @@ const Auth = () => {
     if (!user) return;
     setSavingAccountType(true);
     try {
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({ account_type: googleAccountType })
         .eq("id", user.id);
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      // Stamp metadata so this modal never re-shows on next login
-      await supabase.auth.updateUser({ data: { account_type: googleAccountType } });
+      const { error: userError } = await supabase.auth.updateUser({
+        data: { account_type: googleAccountType },
+      });
+      if (userError) throw userError;
+
+      await supabase.auth.refreshSession();
 
       toast({ title: "Account type saved", description: `Registered as ${googleAccountType}.` });
       setShowAccountTypeModal(false);
       navigate("/");
-    } catch (err: any) {
-      toast({ title: "Failed to save", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to save account type.";
+      toast({ title: "Failed to save", description: message, variant: "destructive" });
     } finally {
       setSavingAccountType(false);
     }

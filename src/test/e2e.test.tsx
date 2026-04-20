@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
+import type { Database } from "@/integrations/supabase/types";
 
 /**
  * Full end-to-end test for the Wellness app.
@@ -15,7 +16,33 @@ import { render, screen, within, waitFor, fireEvent } from "@testing-library/rea
  */
 
 // ---------- Fixtures ----------
-const productsFixture = [
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+type ProductFixture = Pick<
+  ProductRow,
+  "id" | "name" | "description" | "price" | "stock" | "unit" | "min_order" | "image_url" | "is_active" | "created_at"
+> & {
+  category_id: string | null;
+  categories: { slug: string; name: string };
+};
+
+type CategoryFixture = Pick<CategoryRow, "id" | "slug" | "name">;
+type ProfileFixture = Pick<ProfileRow, "id">;
+
+type FixtureRow = ProductFixture | CategoryFixture | ProfileFixture;
+
+type QueryResult<T> = { data: T; error: null };
+type QueryBuilder<T> = {
+  select: () => QueryBuilder<T>;
+  eq: () => QueryBuilder<T>;
+  order: () => QueryBuilder<T>;
+  single: () => Promise<QueryResult<T | null>>;
+  then: <R>(resolve: (v: QueryResult<T[]>) => R, reject?: (e: unknown) => unknown) => Promise<R>;
+};
+
+const productsFixture: ProductFixture[] = [
   {
     id: "p-vit-d",
     name: "Vitamin D3 5000IU",
@@ -24,6 +51,7 @@ const productsFixture = [
     stock: 500,
     unit: "bottle",
     min_order: 2,
+    category_id: "c1",
     image_url: "https://example.com/vit-d.jpg",
     is_active: true,
     created_at: "2026-01-01T00:00:00Z",
@@ -37,6 +65,7 @@ const productsFixture = [
     stock: 150,
     unit: "tub",
     min_order: 1,
+    category_id: "c2",
     image_url: "https://example.com/protein.jpg",
     is_active: true,
     created_at: "2026-01-02T00:00:00Z",
@@ -50,6 +79,7 @@ const productsFixture = [
     stock: 2000,
     unit: "pack",
     min_order: 5,
+    category_id: "c3",
     image_url: "https://example.com/para.jpg",
     is_active: true,
     created_at: "2026-01-03T00:00:00Z",
@@ -57,7 +87,7 @@ const productsFixture = [
   },
 ];
 
-const categoriesFixture = [
+const categoriesFixture: CategoryFixture[] = [
   { id: "c1", slug: "vitamins", name: "Vitamins" },
   { id: "c2", slug: "fitness", name: "Fitness" },
   { id: "c3", slug: "vitals", name: "Vitals" },
@@ -67,26 +97,24 @@ const categoriesFixture = [
 // Builder that resolves to { data, error } — also thenable directly so
 // `await supabase.from(...).select(...).eq(...)` works (no .order needed).
 function makeQueryBuilder(table: string) {
-  let rows: any[] = [];
+  let rows: FixtureRow[] = [];
   if (table === "products") rows = [...productsFixture];
   if (table === "categories") rows = [...categoriesFixture];
-  if (table === "profiles") rows = [];
+  if (table === "profiles") rows = [] as ProfileFixture[];
 
-  const result = { data: rows, error: null };
+  const result: QueryResult<FixtureRow[]> = { data: rows, error: null };
 
-  const builder: any = {
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    order: vi.fn(() => builder),
-    single: vi.fn(() => Promise.resolve({ data: rows[0] ?? null, error: null })),
-    then: (resolve: (v: any) => any, reject?: (e: any) => any) =>
-      Promise.resolve(result).then(resolve, reject),
-  };
+  const builder = {} as QueryBuilder<FixtureRow>;
+  builder.select = vi.fn(() => builder);
+  builder.eq = vi.fn(() => builder);
+  builder.order = vi.fn(() => builder);
+  builder.single = vi.fn(() => Promise.resolve({ data: rows[0] ?? null, error: null }));
+  builder.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
   return builder;
 }
 
 vi.mock("@/integrations/supabase/client", () => {
-  const authListeners: any[] = [];
+  const authListeners: Array<(event: string, session: unknown) => void> = [];
   return {
     supabase: {
       from: vi.fn((table: string) => makeQueryBuilder(table)),
@@ -94,7 +122,7 @@ vi.mock("@/integrations/supabase/client", () => {
         getSession: vi.fn(() =>
           Promise.resolve({ data: { session: null }, error: null })
         ),
-        onAuthStateChange: vi.fn((cb: any) => {
+        onAuthStateChange: vi.fn((cb: (event: string, session: unknown) => void) => {
           authListeners.push(cb);
           return {
             data: { subscription: { unsubscribe: vi.fn() } },
@@ -117,7 +145,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
 // Avoid noisy "not implemented: scrollTo" + matchMedia is already in setup.ts
 beforeEach(() => {
-  window.scrollTo = vi.fn() as any;
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   // Reset the URL between tests so each starts at "/"
   window.history.pushState({}, "", "/");
 });

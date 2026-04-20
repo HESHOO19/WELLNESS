@@ -13,15 +13,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import ImageUpload from "@/components/ImageUpload";
 import { Plus, Package, ShoppingCart, Pencil, Trash2, Loader2, X, DollarSign, TrendingUp } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
-const statusOptions = ["pending", "confirmed", "shipped", "delivered", "cancelled"] as const;
+type OrderStatus = Database["public"]["Enums"]["order_status"];
+const statusOptions: OrderStatus[] = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
 
-const statusCls = (s: string) =>
+const statusCls = (s: OrderStatus) =>
   s === "pending" ? "bg-yellow-500/10 text-yellow-600" :
   s === "confirmed" ? "bg-blue-500/10 text-blue-600" :
   s === "shipped" ? "bg-purple-500/10 text-purple-600" :
   s === "delivered" ? "bg-green-500/10 text-green-600" :
   "bg-destructive/10 text-destructive";
+
+type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
+type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
+
+type ProductWithCategory = ProductRow & {
+  categories: Pick<CategoryRow, "name" | "slug"> | null;
+};
+
+type OrderItemWithProduct = OrderItemRow & {
+  products: Pick<ProductRow, "name" | "supplier_id" | "image_url"> | null;
+};
+
+type SupplierOrder = OrderRow & {
+  order_items: OrderItemWithProduct[];
+};
 
 const SupplierDashboard = () => {
   const { user, accountType } = useAuth();
@@ -53,7 +72,7 @@ const SupplierDashboard = () => {
         .eq("supplier_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as ProductWithCategory[];
     },
     enabled: !!user && isSupplier,
   });
@@ -63,15 +82,11 @@ const SupplierDashboard = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("*, order_items(*, products(name, supplier_id, image_url))")
+        .select("*, order_items!inner(*, products!inner(name, supplier_id, image_url))")
+        .eq("order_items.products.supplier_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).map(order => ({
-        ...order,
-        order_items: (order.order_items ?? []).filter(
-          (oi: any) => oi.products?.supplier_id === user!.id
-        ),
-      })).filter(order => order.order_items.length > 0);
+      return (data ?? []) as SupplierOrder[];
     },
     enabled: !!user && isSupplier,
   });
@@ -103,7 +118,10 @@ const SupplierDashboard = () => {
       toast({ title: editingId ? "Product updated" : "Product added" });
       resetForm();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Unable to save product.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -119,7 +137,7 @@ const SupplierDashboard = () => {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: typeof statusOptions[number] }) => {
+    mutationFn: async ({ orderId, status }: { orderId: string; status: OrderStatus }) => {
       const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
       if (error) throw error;
     },
@@ -127,7 +145,10 @@ const SupplierDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
       toast({ title: "Order status updated" });
     },
-    onError: (err: any) => toast({ title: "Update failed", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Unable to update status.";
+      toast({ title: "Update failed", description: message, variant: "destructive" });
+    },
   });
 
   const resetForm = () => {
@@ -137,7 +158,7 @@ const SupplierDashboard = () => {
     setImageUrl(""); setStock(""); setUnit("piece"); setMinOrder("1");
   };
 
-  const startEdit = (product: any) => {
+  const startEdit = (product: ProductWithCategory) => {
     setEditingId(product.id);
     setName(product.name);
     setDescription(product.description ?? "");
@@ -151,11 +172,11 @@ const SupplierDashboard = () => {
   };
 
   // Stats
-  const revenue = (myOrders ?? []).reduce((sum, o: any) => {
-    return sum + o.order_items.reduce((s: number, oi: any) => s + Number(oi.unit_price) * oi.quantity, 0);
+  const revenue = (myOrders ?? []).reduce((sum, order) => {
+    return sum + order.order_items.reduce((itemSum, item) => itemSum + Number(item.unit_price) * item.quantity, 0);
   }, 0);
-  const pendingCount = (myOrders ?? []).filter((o: any) => o.status === "pending").length;
-  const lowStockCount = (myProducts ?? []).filter((p: any) => p.stock < 10).length;
+  const pendingCount = (myOrders ?? []).filter((order) => order.status === "pending").length;
+  const lowStockCount = (myProducts ?? []).filter((product) => product.stock < 10).length;
 
   if (!isSupplier) {
     return (
@@ -302,7 +323,7 @@ const SupplierDashboard = () => {
             </div>
           ) : (
             <div className="grid gap-3">
-              {myProducts.map(product => (
+              {myProducts.map((product) => (
                 <div key={product.id} className="glass-card rounded-xl p-4 flex items-center gap-4">
                   <div className="w-14 h-14 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
                     {product.image_url ? (
@@ -315,7 +336,7 @@ const SupplierDashboard = () => {
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-sm truncate">{product.name}</h3>
                       <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {(product as any).categories?.name ?? "Uncategorized"}
+                        {product.categories?.name ?? "Uncategorized"}
                       </span>
                     </div>
                     <p className="text-muted-foreground text-xs">
@@ -350,7 +371,7 @@ const SupplierDashboard = () => {
             </div>
           ) : (
             <div className="grid gap-3">
-              {myOrders.map((order: any) => (
+              {myOrders.map((order) => (
                 <div key={order.id} className="glass-card rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                     <div>
@@ -365,7 +386,7 @@ const SupplierDashboard = () => {
                       </span>
                       <Select
                         value={order.status}
-                        onValueChange={(v) => updateStatusMutation.mutate({ orderId: order.id, status: v as any })}
+                        onValueChange={(v) => updateStatusMutation.mutate({ orderId: order.id, status: v as OrderStatus })}
                       >
                         <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -377,7 +398,7 @@ const SupplierDashboard = () => {
                     </div>
                   </div>
                   <div className="space-y-1 mb-2">
-                    {order.order_items.map((oi: any) => (
+                    {order.order_items.map((oi) => (
                       <div key={oi.id} className="flex justify-between text-xs text-muted-foreground">
                         <span>{oi.products?.name} × {oi.quantity}</span>
                         <span className="font-medium text-foreground">EGP {(Number(oi.unit_price) * oi.quantity).toLocaleString()}</span>

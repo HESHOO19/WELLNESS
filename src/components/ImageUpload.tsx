@@ -39,8 +39,9 @@ const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
       const { data } = supabase.storage.from("product-images").getPublicUrl(path);
       onChange(data.publicUrl);
       toast({ title: "Image uploaded" });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Upload failed.";
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
