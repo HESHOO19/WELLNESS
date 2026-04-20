@@ -48,5 +48,24 @@ npm run lint
 npm run test
 ```
 
+## Deployment
+
+### Vercel
+- Import the GitHub repository
+- Framework preset: Vite
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment variables:
+	- `VITE_SUPABASE_URL`
+	- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+### Netlify
+- New site from Git
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Environment variables:
+	- `VITE_SUPABASE_URL`
+	- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
 ## License
 MIT
