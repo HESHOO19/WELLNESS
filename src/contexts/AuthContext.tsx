@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   accountType: AccountType;
+  refreshAccountType: (userId?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   accountType: null,
+  refreshAccountType: async () => {},
   signOut: async () => {},
 });
 
@@ -27,15 +29,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<AccountType>(null);
 
-  const fetchAccountType = async (userId: string) => {
+  const refreshAccountType = useCallback(async (userId?: string) => {
+    const lookupId = userId ?? user?.id;
+    if (!lookupId) {
+      setAccountType(null);
+      setLoading(false);
+      return;
+    }
     const { data } = await supabase
       .from("profiles")
       .select("account_type")
-      .eq("id", userId)
+      .eq("id", lookupId)
       .single();
     setAccountType((data?.account_type as AccountType) ?? null);
     setLoading(false);
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     // Get initial session first, then subscribe to changes.
@@ -45,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchAccountType(session.user.id);
+        refreshAccountType(session.user.id);
       } else {
         setLoading(false);
       }
@@ -55,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchAccountType(session.user.id);
+        refreshAccountType(session.user.id);
       } else {
         setAccountType(null);
         setLoading(false);
@@ -63,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refreshAccountType]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -71,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, accountType, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, accountType, refreshAccountType, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,8 @@ import logo from "@/assets/wellness_logo.svg";
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, accountType, refreshAccountType } = useAuth();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -30,7 +31,7 @@ const Auth = () => {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [accountType, setAccountType] = useState<"buyer" | "supplier">("buyer");
+  const [registrationAccountType, setRegistrationAccountType] = useState<"buyer" | "supplier">("buyer");
 
   // Google OAuth: new-user account-type selection modal
   const [showAccountTypeModal, setShowAccountTypeModal] = useState(false);
@@ -38,23 +39,28 @@ const Auth = () => {
   const [savingAccountType, setSavingAccountType] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      // If user signed in with Google and has no account_type in their metadata yet,
-      // they're a brand-new Google user — show the account-type selection modal.
-      const isGoogleUser = user.app_metadata?.provider === "google";
-      const hasNoAccountType = user.user_metadata?.account_type === undefined;
-      const isNewUser =
-        isGoogleUser &&
-        hasNoAccountType &&
-        Date.now() - new Date(user.created_at).getTime() < 60_000;
+    if (!user) return;
 
-      if (isNewUser) {
-        setShowAccountTypeModal(true);
-      } else {
-        navigate("/");
-      }
+    const forceOnboarding = searchParams.get("onboarding") === "1";
+    const isGoogleUser = user.app_metadata?.provider === "google";
+    const hasNoAccountType = user.user_metadata?.account_type === undefined;
+    const isNewUser =
+      isGoogleUser &&
+      hasNoAccountType &&
+      Date.now() - new Date(user.created_at).getTime() < 60_000;
+
+    if (forceOnboarding || isNewUser) {
+      setShowAccountTypeModal(true);
+      return;
     }
-  }, [user, navigate]);
+
+    if (!accountType) {
+      refreshAccountType(user.id);
+      return;
+    }
+
+    navigate(accountType === "supplier" ? "/supplier" : "/orders");
+  }, [user, accountType, navigate, refreshAccountType, searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +85,7 @@ const Auth = () => {
       email: regEmail,
       password: regPassword,
       options: {
-        data: { business_name: regName, phone: regPhone, account_type: accountType },
+        data: { business_name: regName, phone: regPhone, account_type: registrationAccountType },
         emailRedirectTo: window.location.origin,
       },
     });
@@ -94,7 +100,7 @@ const Auth = () => {
   const handleGoogleLogin = async () => {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}/auth/callback`,
     });
     if (result.error) {
       toast({ title: "Google sign in failed", description: String(result.error), variant: "destructive" });
@@ -112,8 +118,7 @@ const Auth = () => {
     try {
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ account_type: googleAccountType })
-        .eq("id", user.id);
+        .upsert({ id: user.id, account_type: googleAccountType }, { onConflict: "id" });
       if (profileError) throw profileError;
 
       const { error: userError } = await supabase.auth.updateUser({
@@ -122,10 +127,11 @@ const Auth = () => {
       if (userError) throw userError;
 
       await supabase.auth.refreshSession();
+      await refreshAccountType(user.id);
 
       toast({ title: "Account type saved", description: `Registered as ${googleAccountType}.` });
       setShowAccountTypeModal(false);
-      navigate("/");
+      navigate(googleAccountType === "supplier" ? "/supplier" : "/orders");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unable to save account type.";
       toast({ title: "Failed to save", description: message, variant: "destructive" });
@@ -236,21 +242,21 @@ const Auth = () => {
                 <div>
                   <Label className="text-sm font-bold mb-2 block">I am a</Label>
                   <RadioGroup
-                    value={accountType}
-                    onValueChange={(v) => setAccountType(v as "buyer" | "supplier")}
+                    value={registrationAccountType}
+                    onValueChange={(v) => setRegistrationAccountType(v as "buyer" | "supplier")}
                     className="grid grid-cols-2 gap-3"
                   >
-                    <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${accountType === "buyer" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
+                    <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${registrationAccountType === "buyer" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
                       <RadioGroupItem value="buyer" id="buyer" className="sr-only" />
-                      <ShoppingBag className={`h-6 w-6 ${accountType === "buyer" ? "text-primary" : "text-muted-foreground"}`} />
+                      <ShoppingBag className={`h-6 w-6 ${registrationAccountType === "buyer" ? "text-primary" : "text-muted-foreground"}`} />
                       <div className="text-center">
                         <p className="font-bold text-sm">Buyer</p>
                         <p className="text-muted-foreground text-[10px] leading-tight">Pharmacy or retailer ordering products</p>
                       </div>
                     </label>
-                    <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${accountType === "supplier" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
+                    <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${registrationAccountType === "supplier" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
                       <RadioGroupItem value="supplier" id="supplier" className="sr-only" />
-                      <Store className={`h-6 w-6 ${accountType === "supplier" ? "text-primary" : "text-muted-foreground"}`} />
+                      <Store className={`h-6 w-6 ${registrationAccountType === "supplier" ? "text-primary" : "text-muted-foreground"}`} />
                       <div className="text-center">
                         <p className="font-bold text-sm">Supplier</p>
                         <p className="text-muted-foreground text-[10px] leading-tight">Distributor or manufacturer listing products</p>
@@ -261,7 +267,7 @@ const Auth = () => {
 
                 <div>
                   <Label htmlFor="reg-name">Business Name</Label>
-                  <Input id="reg-name" placeholder={accountType === "supplier" ? "Your Company" : "Your Pharmacy"} required className="mt-1" value={regName} onChange={e => setRegName(e.target.value)} />
+                  <Input id="reg-name" placeholder={registrationAccountType === "supplier" ? "Your Company" : "Your Pharmacy"} required className="mt-1" value={regName} onChange={e => setRegName(e.target.value)} />
                 </div>
                 <div>
                   <Label htmlFor="reg-email">Email</Label>
@@ -276,7 +282,7 @@ const Auth = () => {
                   <Input id="reg-phone" type="tel" placeholder="+20 XXX XXX XXXX" required className="mt-1" value={regPhone} onChange={e => setRegPhone(e.target.value)} />
                 </div>
                 <Button type="submit" className="w-full rounded-full gradient-primary text-primary-foreground font-bold" disabled={loading}>
-                  {loading ? "Creating account..." : `Register as ${accountType === "supplier" ? "Supplier" : "Buyer"}`}
+                  {loading ? "Creating account..." : `Register as ${registrationAccountType === "supplier" ? "Supplier" : "Buyer"}`}
                 </Button>
               </form>
             </TabsContent>

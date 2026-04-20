@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Shop from "./pages/Shop";
 import Checkout from "./pages/Checkout";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import SupplierDashboard from "./pages/SupplierDashboard";
 import BuyerOrders from "./pages/BuyerOrders";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/shop" element={<Shop />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/supplier" element={<SupplierDashboard />} />
               <Route path="/orders" element={<BuyerOrders />} />
               <Route path="*" element={<NotFound />} />
