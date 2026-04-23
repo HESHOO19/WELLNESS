@@ -109,7 +109,7 @@ function makeQueryBuilder(table: string) {
   builder.eq = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
   builder.single = vi.fn(() => Promise.resolve({ data: rows[0] ?? null, error: null }));
-  builder.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+  builder.then = ((resolve, reject) => Promise.resolve(result).then(resolve, reject)) as QueryBuilder<FixtureRow>["then"];
   return builder;
 }
 

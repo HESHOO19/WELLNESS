@@ -79,7 +79,7 @@ export type Database = {
           email: string
           id: string
           preferences: Json
-          source: string
+          source: string | null
           updated_at: string
           user_id: string | null
         }
@@ -88,7 +88,7 @@ export type Database = {
           email: string
           id?: string
           preferences?: Json
-          source?: string
+          source?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -97,7 +97,7 @@ export type Database = {
           email?: string
           id?: string
           preferences?: Json
-          source?: string
+          source?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -144,27 +144,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      supplier_subscriptions: {
-        Row: {
-          created_at: string
-          id: string
-          supplier_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          supplier_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          supplier_id?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       orders: {
         Row: {
@@ -300,6 +279,27 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          supplier_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          supplier_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          supplier_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -327,6 +327,8 @@ export type Database = {
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           status: Database["public"]["Enums"]["order_status"]
+          supplier_id: string | null
+          supplier_name: string | null
           total: number
           updated_at: string
           user_id: string
