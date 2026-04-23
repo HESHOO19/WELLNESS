@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -10,7 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   accountType: AccountType;
-  refreshAccountType: (userId?: string) => Promise<void>;
+  refreshAccountType: (userId: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -29,9 +29,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<AccountType>(null);
 
-  const refreshAccountType = useCallback(async (userId?: string) => {
-    const lookupId = userId ?? user?.id;
-    if (!lookupId) {
+  // Use a ref so refreshAccountType never changes identity and never triggers
+  // useEffect re-runs. The ref always points at the latest implementation.
+  const refreshAccountTypeRef = useRef<(userId: string) => Promise<void>>();
+
+  refreshAccountTypeRef.current = async (userId: string) => {
+    if (!userId) {
       setAccountType(null);
       setLoading(false);
       return;
@@ -40,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase
       .from("profiles")
       .select("account_type")
-      .eq("id", lookupId)
+      .eq("id", userId)
       .single();
 
     if (data?.account_type) {
@@ -49,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // PGRST116 = row not found — not a real error, continue to upsert flow
     if (error && error.code && error.code !== "PGRST116") {
       setAccountType(null);
       setLoading(false);
@@ -56,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const { data: authData } = await supabase.auth.getUser();
-    const authUser = authData.user ?? user;
+    const authUser = authData.user;
     const metaType = authUser?.user_metadata?.account_type;
 
     if (metaType === "buyer" || metaType === "supplier") {
@@ -67,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         business_name?: string;
         phone?: string;
       } = {
-        id: lookupId,
+        id: userId,
         account_type: metaType,
         email: authUser?.email ?? null,
       };
@@ -95,12 +99,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setAccountType(null);
     setLoading(false);
-  }, [user]);
+  };
+
+  // Stable function reference — never changes, never causes re-renders / re-effects
+  const refreshAccountType = (userId: string) =>
+    refreshAccountTypeRef.current!(userId);
 
   useEffect(() => {
     // Get initial session first, then subscribe to changes.
-    // This prevents a race where onAuthStateChange fires before getSession resolves,
-    // causing accountType to flicker as null for already-logged-in users.
+    // This effect runs exactly ONCE on mount (empty dep array).
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -123,7 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => subscription.unsubscribe();
-  }, [refreshAccountType]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ← intentionally empty: setup auth listeners once only
 
   const signOut = async () => {
     await supabase.auth.signOut();
