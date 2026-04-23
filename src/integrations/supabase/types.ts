@@ -44,65 +44,6 @@ export type Database = {
         }
         Relationships: []
       }
-      favorite_products: {
-        Row: {
-          created_at: string
-          id: string
-          product_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          product_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          product_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "favorite_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      newsletter_subscriptions: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          preferences: Json
-          source: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          preferences?: Json
-          source?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          preferences?: Json
-          source?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       order_items: {
         Row: {
           created_at: string
@@ -145,27 +86,6 @@ export type Database = {
           },
         ]
       }
-      supplier_subscriptions: {
-        Row: {
-          created_at: string
-          id: string
-          supplier_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          supplier_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          supplier_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       orders: {
         Row: {
           created_at: string
@@ -176,8 +96,6 @@ export type Database = {
           notes: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           status: Database["public"]["Enums"]["order_status"]
-          supplier_id: string | null
-          supplier_name: string | null
           total: number
           updated_at: string
           user_id: string
@@ -191,8 +109,6 @@ export type Database = {
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           status?: Database["public"]["Enums"]["order_status"]
-          supplier_id?: string | null
-          supplier_name?: string | null
           total?: number
           updated_at?: string
           user_id: string
@@ -206,8 +122,6 @@ export type Database = {
           notes?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           status?: Database["public"]["Enums"]["order_status"]
-          supplier_id?: string | null
-          supplier_name?: string | null
           total?: number
           updated_at?: string
           user_id?: string
@@ -308,35 +222,6 @@ export type Database = {
       get_account_type: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["account_type"]
-      }
-      place_order: {
-        Args: {
-          delivery_address: string
-          delivery_city: string
-          delivery_phone: string
-          items: Json
-          notes?: string
-          payment_method: Database["public"]["Enums"]["payment_method"]
-        }
-        Returns: {
-          created_at: string
-          delivery_address: string | null
-          delivery_city: string | null
-          delivery_phone: string | null
-          id: string
-          notes: string | null
-          payment_method: Database["public"]["Enums"]["payment_method"]
-          status: Database["public"]["Enums"]["order_status"]
-          total: number
-          updated_at: string
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "orders"
-          isOneToOne: true
-          isSetofReturn: false
-        }
       }
     }
     Enums: {
