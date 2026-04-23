@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/contexts/CartContext";
 import logo from "@/assets/wellness_logo.svg";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, ShoppingCart, User, X, LogOut, Store, ShoppingBag } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { Bell, Search, ShoppingCart, User, X, LogOut, Store, ShoppingBag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -18,12 +23,95 @@ interface HeaderProps {
   onCartOpen?: () => void;
 }
 
+type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type SupplierOrderRow = Database["public"]["Tables"]["supplier_orders"]["Row"];
+
+type BuyerSupplierNotification = Pick<SupplierOrderRow, "id" | "status" | "supplier_name" | "created_at" | "order_id"> & {
+  orders: Pick<OrderRow, "id" | "created_at" | "total"> | null;
+};
+type ProductNotification = Pick<ProductRow, "id" | "name" | "price" | "created_at">;
+type SupplierOrderNotification = Pick<SupplierOrderRow, "id" | "status" | "created_at" | "order_id" | "supplier_name">;
+
 const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
   const { totalItems } = useCart();
   const { user, signOut, accountType } = useAuth();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const isBuyer = accountType === "buyer";
+  const isSupplier = accountType === "supplier";
+  const showNotifications = !!user && (isBuyer || isSupplier);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: pendingConfirmations = [], isLoading: pendingConfirmationsLoading } = useQuery<BuyerSupplierNotification[]>({
+    queryKey: ["notifications", "buyer-pending-confirmations", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_orders")
+        .select("id, status, supplier_name, created_at, order_id, orders!inner(id, created_at, total, user_id)")
+        .eq("status", "pending")
+        .eq("orders.user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as BuyerSupplierNotification[];
+    },
+    enabled: !!user && isBuyer,
+  });
+
+  const { data: confirmedSuppliers = [], isLoading: confirmedSuppliersLoading } = useQuery<BuyerSupplierNotification[]>({
+    queryKey: ["notifications", "buyer-confirmed-suppliers", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_orders")
+        .select("id, status, supplier_name, created_at, order_id, orders!inner(id, created_at, total, user_id)")
+        .in("status", ["confirmed", "shipped", "delivered"])
+        .eq("orders.user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as BuyerSupplierNotification[];
+    },
+    enabled: !!user && isBuyer,
+  });
+
+  const { data: newProducts = [], isLoading: newProductsLoading } = useQuery<ProductNotification[]>({
+    queryKey: ["notifications", "buyer-new-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, price, created_at")
+        .gte("created_at", sevenDaysAgo)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as ProductNotification[];
+    },
+    enabled: isBuyer,
+  });
+
+  const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<SupplierOrderNotification[]>({
+    queryKey: ["notifications", "supplier-pending-orders", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("supplier_orders")
+        .select("id, status, created_at, order_id, supplier_name")
+        .eq("supplier_id", user!.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as SupplierOrderNotification[];
+    },
+    enabled: !!user && isSupplier,
+  });
+
+  const notificationCount = isBuyer
+    ? pendingConfirmations.length + confirmedSuppliers.length + newProducts.length
+    : isSupplier
+      ? pendingOrders.length
+      : 0;
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -67,6 +155,116 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
               </span>
             )}
           </Button>
+
+          {showNotifications && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                      {notificationCount > 9 ? "9+" : notificationCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 p-2">
+                <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {isBuyer ? (
+                  <div className="space-y-2">
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Pending Confirmations</div>
+                    {pendingConfirmationsLoading ? (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading pending confirmations...</div>
+                    ) : pendingConfirmations.length ? (
+                      pendingConfirmations.map((supplierOrder) => (
+                        <DropdownMenuItem key={supplierOrder.id} onSelect={() => navigate("/orders")}> 
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium">Order #{supplierOrder.order_id.slice(0, 8)}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Waiting for {supplierOrder.supplier_name}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No pending confirmations.</div>
+                    )}
+
+                    <DropdownMenuSeparator />
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Confirmed Suppliers</div>
+                    {confirmedSuppliersLoading ? (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading confirmations...</div>
+                    ) : confirmedSuppliers.length ? (
+                      confirmedSuppliers.map((supplierOrder) => (
+                        <DropdownMenuItem key={supplierOrder.id} onSelect={() => navigate("/orders")}> 
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium">Order #{supplierOrder.order_id.slice(0, 8)}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {supplierOrder.supplier_name} · {supplierOrder.status}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No supplier confirmations yet.</div>
+                    )}
+
+                    <DropdownMenuItem onSelect={() => navigate("/orders")} className="text-xs text-primary">
+                      Open buyer dashboard
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Products (last 7 days)</div>
+                    {newProductsLoading ? (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading new products...</div>
+                    ) : newProducts.length ? (
+                      newProducts.map((product) => (
+                        <DropdownMenuItem key={product.id} onSelect={() => navigate("/shop")}> 
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium">{product.name}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              EGP {Number(product.price).toLocaleString()} · {new Date(product.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No new products this week.</div>
+                    )}
+
+                    <DropdownMenuItem onSelect={() => navigate("/shop")} className="text-xs text-primary">
+                      Browse the catalog
+                    </DropdownMenuItem>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Order Requests</div>
+                    {pendingLoading ? (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading incoming orders...</div>
+                    ) : pendingOrders.length ? (
+                      pendingOrders.map((order) => {
+                        return (
+                          <DropdownMenuItem key={order.id} onSelect={() => navigate("/supplier")}>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-medium">Order #{order.order_id.slice(0, 8)}</span>
+                              <span className="text-[10px] text-muted-foreground">Waiting for your confirmation</span>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })
+                    ) : (
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No new order requests.</div>
+                    )}
+
+                    <DropdownMenuItem onSelect={() => navigate("/supplier")} className="text-xs text-primary">
+                      Open supplier dashboard
+                    </DropdownMenuItem>
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {user ? (
             <DropdownMenu>

@@ -41,10 +41,24 @@ export const placeOrder = async (params: PlaceOrderParams) => {
     if (normalized.includes("invalid or inactive")) {
       throw new Error("Some items are no longer available.");
     }
+    if (normalized.includes("multiple suppliers")) {
+      throw new Error("Please order from one supplier at a time.");
+    }
+    if (normalized.includes("missing supplier")) {
+      throw new Error("Some items are missing supplier information.");
+    }
     if (normalized.includes("not authenticated")) {
       throw new Error("Please sign in to place an order.");
     }
     throw new Error(message);
+  }
+
+  if (order?.id) {
+    supabase.functions
+      .invoke("notify-order-placed", { body: { orderId: order.id } })
+      .catch(() => {
+        // Email failures should not block checkout UX.
+      });
   }
 
   return order;

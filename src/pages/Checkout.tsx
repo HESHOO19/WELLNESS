@@ -33,7 +33,7 @@ const Checkout = () => {
     const formData = new FormData(form);
 
     try {
-      await placeOrder({
+      const order = await placeOrder({
         items,
         paymentMethod,
         deliveryAddress: formData.get("address") as string,
@@ -44,9 +44,7 @@ const Checkout = () => {
 
       toast({
         title: "Order placed successfully! 🎉",
-        description: paymentMethod === "cod"
-          ? "Your order will be delivered with cash on delivery."
-          : "Payment processed securely. Your order is confirmed.",
+        description: `Order #${order.id.slice(0, 8)} is pending supplier confirmation. We'll notify you as suppliers confirm.`,
       });
       clearCart();
       navigate("/");

@@ -55,18 +55,22 @@ const BuyerOrders = () => {
   if (!user) return null;
 
   const totalSpent = (orders ?? []).reduce((sum, o) => sum + Number(o.total), 0);
+  const pendingOrders = (orders ?? []).filter((order) => order.status === "pending");
+  const confirmedOrders = (orders ?? []).filter((order) =>
+    ["confirmed", "shipped", "delivered"].includes(order.status),
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="max-w-5xl mx-auto px-4 md:px-6 py-8">
         <div className="mb-8">
-          <h1 className="font-heading text-3xl font-extrabold">My Orders</h1>
-          <p className="text-muted-foreground text-sm mt-1">Track your purchases and delivery status</p>
+          <h1 className="font-heading text-3xl font-extrabold">Buyer Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Track confirmations, spending, and delivery progress</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="glass-card-elevated rounded-2xl p-5">
             <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Orders</p>
             <p className="font-heading text-2xl font-extrabold mt-1">{orders?.length ?? 0}</p>
@@ -75,11 +79,13 @@ const BuyerOrders = () => {
             <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Spent</p>
             <p className="font-heading text-2xl font-extrabold mt-1">EGP {totalSpent.toLocaleString()}</p>
           </div>
-          <div className="glass-card-elevated rounded-2xl p-5 col-span-2 md:col-span-1">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">In Transit</p>
-            <p className="font-heading text-2xl font-extrabold mt-1">
-              {(orders ?? []).filter(o => o.status === "shipped" || o.status === "confirmed").length}
-            </p>
+          <div className="glass-card-elevated rounded-2xl p-5">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Pending Confirmations</p>
+            <p className="font-heading text-2xl font-extrabold mt-1">{pendingOrders.length}</p>
+          </div>
+          <div className="glass-card-elevated rounded-2xl p-5">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Confirmed Suppliers</p>
+            <p className="font-heading text-2xl font-extrabold mt-1">{confirmedOrders.length}</p>
           </div>
         </div>
 
@@ -93,51 +99,147 @@ const BuyerOrders = () => {
             <Button onClick={() => navigate("/shop")} variant="hero" className="rounded-full">Browse Catalog</Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {orders.map((order) => {
-              const meta = statusMeta[order.status] ?? statusMeta.pending;
-              const Icon = meta.icon;
-              return (
-                <div key={order.id} className="glass-card-elevated rounded-2xl p-5">
-                  <div className="flex items-start justify-between mb-3 gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm">Order #{order.id.slice(0, 8)}</span>
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${meta.cls}`}>
-                          <Icon className="h-3 w-3" /> {meta.label}
-                        </span>
+          <div className="space-y-8">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-yellow-600" />
+                <h2 className="font-heading font-bold text-lg">Pending Confirmations</h2>
+              </div>
+              {pendingOrders.length ? (
+                <div className="space-y-3">
+                  {pendingOrders.map((order) => {
+                    const pendingNames = order.supplier_orders
+                      .filter((supplierOrder) => supplierOrder.status === "pending")
+                      .map((supplierOrder) => supplierOrder.supplier_name);
+                    return (
+                      <div key={order.id} className="glass-card-elevated rounded-2xl p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm">Order #{order.id.slice(0, 8)}</span>
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 bg-yellow-500/10 text-yellow-600">
+                                <Clock className="h-3 w-3" /> Pending
+                              </span>
+                            </div>
+                            <p className="text-muted-foreground text-xs mt-1">
+                              Waiting for {formatSupplierNames(pendingNames)} to confirm
+                            </p>
+                          </div>
+                          <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
+                        </div>
+                        <p className="text-muted-foreground text-xs mt-2">
+                          {new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                        </p>
                       </div>
-                      <p className="text-muted-foreground text-xs mt-1">
-                        {new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
-                        {" · "}
-                        {order.payment_method === "cod" ? "Cash on Delivery" : "Online Payment"}
-                      </p>
-                    </div>
-                    <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
-                  </div>
-                  <div className="space-y-2 border-t border-border pt-3">
-                    {order.order_items.map((oi) => (
-                      <div key={oi.id} className="flex items-center gap-3 text-sm">
-                        <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
-                          {oi.products?.image_url ? (
-                            <img src={oi.products.image_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center"><Package className="h-4 w-4 text-muted-foreground" /></div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
+                  No pending confirmations right now.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                <h2 className="font-heading font-bold text-lg">Confirmed By Suppliers</h2>
+              </div>
+              {confirmedSuppliers.length ? (
+                <div className="space-y-3">
+                  {confirmedSuppliers.map((supplierOrder) => {
+                    const order = ordersById.get(supplierOrder.order_id);
+                    const meta = statusMeta[supplierOrder.status] ?? statusMeta.confirmed;
+                    const Icon = meta.icon;
+                    return (
+                      <div key={supplierOrder.id} className="glass-card-elevated rounded-2xl p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm">Order #{supplierOrder.order_id.slice(0, 8)}</span>
+                              <span className={`text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${meta.cls}`}>
+                                <Icon className="h-3 w-3" /> {meta.label}
+                              </span>
+                            </div>
+                            <p className="text-muted-foreground text-xs mt-1">
+                              Confirmed by {supplierOrder.supplier_name}
+                            </p>
+                          </div>
+                          <p className="font-heading font-extrabold">EGP {Number(order?.total ?? 0).toLocaleString()}</p>
+                        </div>
+                        <p className="text-muted-foreground text-xs mt-2">
+                          {new Date(supplierOrder.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
+                  No confirmed supplier updates yet.
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <ShoppingBag className="h-4 w-4 text-primary" />
+                <h2 className="font-heading font-bold text-lg">All Orders</h2>
+              </div>
+              <div className="space-y-3">
+                {orders.map((order) => {
+                  const meta = statusMeta[order.status] ?? statusMeta.pending;
+                  const Icon = meta.icon;
+                  const supplierNames = order.supplier_orders?.map((supplierOrder) => supplierOrder.supplier_name) ?? [];
+                  return (
+                    <div key={order.id} className="glass-card-elevated rounded-2xl p-5">
+                      <div className="flex items-start justify-between mb-3 gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm">Order #{order.id.slice(0, 8)}</span>
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full inline-flex items-center gap-1 ${meta.cls}`}>
+                              <Icon className="h-3 w-3" /> {meta.label}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground text-xs mt-1">
+                            {new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                            {" · "}
+                            {order.payment_method === "cod" ? "Cash on Delivery" : "Online Payment"}
+                          </p>
+                          {supplierNames.length > 0 && (
+                            <p className="text-muted-foreground text-xs mt-1">
+                              Suppliers: {formatSupplierNames(supplierNames)}
+                            </p>
                           )}
                         </div>
-                        <span className="flex-grow truncate">{oi.products?.name ?? "Product"} × {oi.quantity}</span>
-                        <span className="font-bold text-xs">EGP {(Number(oi.unit_price) * oi.quantity).toLocaleString()}</span>
+                        <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
                       </div>
-                    ))}
-                  </div>
-                  {order.delivery_address && (
-                    <p className="text-muted-foreground text-xs mt-3 pt-3 border-t border-border">
-                      📍 {order.delivery_address}, {order.delivery_city}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+                      <div className="space-y-2 border-t border-border pt-3">
+                        {order.order_items.map((oi) => (
+                          <div key={oi.id} className="flex items-center gap-3 text-sm">
+                            <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
+                              {oi.products?.image_url ? (
+                                <img src={oi.products.image_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center"><Package className="h-4 w-4 text-muted-foreground" /></div>
+                              )}
+                            </div>
+                            <span className="flex-grow truncate">{oi.products?.name ?? "Product"} × {oi.quantity}</span>
+                            <span className="font-bold text-xs">EGP {(Number(oi.unit_price) * oi.quantity).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {order.delivery_address && (
+                        <p className="text-muted-foreground text-xs mt-3 pt-3 border-t border-border">
+                          📍 {order.delivery_address}, {order.delivery_city}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </main>

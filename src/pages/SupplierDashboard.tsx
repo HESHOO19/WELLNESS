@@ -83,6 +83,7 @@ const SupplierDashboard = () => {
       const { data, error } = await supabase
         .from("orders")
         .select("*, order_items!inner(*, products!inner(name, supplier_id, image_url))")
+        .eq("supplier_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SupplierOrder[];
@@ -143,12 +144,24 @@ const SupplierDashboard = () => {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: OrderStatus }) => {
-      const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+      const { error } = await supabase
+        .from("orders")
+        .update({ status })
+        .eq("id", orderId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
       toast({ title: "Order status updated" });
+      if (["confirmed", "shipped", "delivered"].includes(variables.status)) {
+        supabase.functions
+          .invoke("notify-order-status", {
+            body: { orderId: variables.orderId, status: variables.status },
+          })
+          .catch(() => {
+            // Email failures should not block status updates.
+          });
+      }
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Unable to update status.";
