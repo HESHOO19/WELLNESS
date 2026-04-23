@@ -4,10 +4,14 @@ export interface Product {
   description: string;
   price: number;
   category: string;
-  image_url: string;
+  image_url: string | null;
   stock: number;
   unit: string;
   min_order: number;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  category_name?: string | null;
+  created_at?: string;
 }
 
 export interface Category {

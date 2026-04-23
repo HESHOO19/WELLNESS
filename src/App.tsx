@@ -12,6 +12,8 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import SupplierDashboard from "./pages/SupplierDashboard";
 import BuyerOrders from "./pages/BuyerOrders";
+import ProductDetail from "./pages/ProductDetail";
+import SupplierDirectory from "./pages/SupplierDirectory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/products/:productId" element={<ProductDetail />} />
+              <Route path="/suppliers" element={<SupplierDirectory />} />
               <Route path="/supplier" element={<SupplierDashboard />} />
               <Route path="/orders" element={<BuyerOrders />} />
               <Route path="*" element={<NotFound />} />

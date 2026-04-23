@@ -1,38 +1,73 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProducts } from "@/hooks/use-products";
 import ProductCard from "./ProductCard";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import type { Product } from "@/types";
 
 interface ProductGridProps {
   categoryFilter?: string;
   searchFilter?: string;
   title?: string;
   pageSize?: number;
+  products?: Product[];
+  role?: "buyer" | "supplier" | "guest";
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-const ProductGrid = ({ categoryFilter, searchFilter, title = "Shop Products", pageSize = 6 }: ProductGridProps) => {
+const ProductGrid = ({
+  categoryFilter,
+  searchFilter,
+  title = "Shop Products",
+  pageSize = 6,
+  products: providedProducts,
+  role = "guest",
+  emptyTitle = "No products found",
+  emptyDescription = "Try adjusting your search or category filter.",
+}: ProductGridProps) => {
   const [page, setPage] = useState(0);
   const { data: products, isLoading } = useProducts();
 
   const filtered = useMemo(() => {
-    let result = products ?? [];
+    const source = providedProducts ?? (products ?? []).map((product) => ({
+      ...product,
+      description: product.description ?? "",
+      price: Number(product.price),
+      category: product.categories?.slug ?? "",
+      category_name: product.categories?.name ?? null,
+      image_url: product.image_url,
+      stock: product.stock,
+      unit: product.unit,
+      min_order: product.min_order,
+      supplier_id: product.supplier_id,
+      supplier_name: null,
+      created_at: product.created_at,
+    }));
+
+    let result = source;
     if (categoryFilter && categoryFilter !== "all") {
-      result = result.filter(p => p.categories?.slug === categoryFilter);
+      result = result.filter((product) => product.category === categoryFilter);
     }
     if (searchFilter) {
       const term = searchFilter.toLowerCase();
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(term) || (p.description ?? "").toLowerCase().includes(term)
+      result = result.filter((product) =>
+        product.name.toLowerCase().includes(term) ||
+        (product.description ?? "").toLowerCase().includes(term) ||
+        (product.supplier_name ?? "").toLowerCase().includes(term)
       );
     }
     return result;
-  }, [products, categoryFilter, searchFilter]);
+  }, [providedProducts, products, categoryFilter, searchFilter]);
 
   const maxPage = Math.max(0, Math.ceil(filtered.length / pageSize) - 1);
   const visible = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
-  if (isLoading) {
+  useEffect(() => {
+    setPage(0);
+  }, [categoryFilter, searchFilter, providedProducts]);
+
+  if (!providedProducts && isLoading) {
     return (
       <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10 flex justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -61,13 +96,13 @@ const ProductGrid = ({ categoryFilter, searchFilter, title = "Shop Products", pa
 
       {visible.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg font-heading font-bold">No products found</p>
-          <p className="text-sm mt-1">Try adjusting your search or category filter.</p>
+          <p className="text-lg font-heading font-bold">{emptyTitle}</p>
+          <p className="text-sm mt-1">{emptyDescription}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {visible.map((product, i) => (
-            <ProductCard key={product.id} product={{ ...product, price: Number(product.price), category: product.categories?.slug ?? "" }} index={i} />
+            <ProductCard key={product.id} product={product} index={i} role={role} />
           ))}
         </div>
       )}

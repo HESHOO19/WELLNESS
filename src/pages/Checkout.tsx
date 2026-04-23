@@ -14,7 +14,7 @@ import { CreditCard, Truck, ArrowLeft, ShoppingBag } from "lucide-react";
 
 const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, accountType } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState<"online" | "cod">("online");
@@ -25,6 +25,15 @@ const Checkout = () => {
     if (!user) {
       toast({ title: "Please sign in", description: "You need to be logged in to place an order.", variant: "destructive" });
       navigate("/auth");
+      return;
+    }
+    if (accountType === "supplier") {
+      toast({
+        title: "Supplier accounts cannot place buyer orders",
+        description: "Switch to a buyer account to check out products.",
+        variant: "destructive",
+      });
+      navigate("/supplier");
       return;
     }
 

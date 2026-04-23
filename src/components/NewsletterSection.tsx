@@ -1,18 +1,58 @@
 import { useState } from "react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import {
+  useNewsletterSubscription,
+  useSupplierSubscriptions,
+} from "@/hooks/use-marketplace";
 
 const NewsletterSection = () => {
-  const [email, setEmail] = useState("");
+  const { user, accountType } = useAuth();
   const { toast } = useToast();
+  const [email, setEmail] = useState(user?.email ?? "");
+  const newsletterMutation = useNewsletterSubscription();
+  const { data: subscriptions = [] } = useSupplierSubscriptions(
+    user?.id,
+    !!user && accountType === "buyer",
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const title =
+    accountType === "supplier" ? "Stay Informed on Supplier Demand" : "Stay Informed";
+  const description =
+    accountType === "supplier"
+      ? "Receive product-performance prompts, inventory reminders, and operational updates tailored to your supplier workflow."
+      : "Get new product alerts, supplier updates, and curated B2B wellness insights that match your marketplace activity.";
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
-    toast({ title: "Subscribed!", description: "You'll receive our weekly wellness updates." });
-    setEmail("");
+    if (!email.trim()) return;
+
+    try {
+      await newsletterMutation.mutateAsync({
+        email,
+        userId: user?.id ?? null,
+        source: "stay-informed",
+        preferences: {
+          account_type: accountType ?? "guest",
+          supplier_subscriptions: subscriptions.length,
+        },
+      });
+
+      toast({
+        title: "You are subscribed",
+        description:
+          accountType === "supplier"
+            ? "We will send supplier-focused updates to your inbox."
+            : "We will keep you posted with relevant supplier and product updates.",
+      });
+      if (!user) setEmail("");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unable to subscribe right now.";
+      toast({ title: "Subscription failed", description: message, variant: "destructive" });
+    }
   };
 
   return (
@@ -23,13 +63,13 @@ const NewsletterSection = () => {
 
         <div className="relative z-10">
           <h2 className="font-heading text-xl md:text-2xl font-bold text-primary-foreground mb-2">
-            Stay Informed
+            {title}
           </h2>
-          <p className="text-primary-foreground/80 text-sm mb-6 max-w-md">
-            Weekly pharmaceutical insights, new product alerts, and exclusive B2B pricing for registered pharmacies.
+          <p className="text-primary-foreground/80 text-sm mb-6 max-w-2xl">
+            {description}
           </p>
 
-          <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
+          <form onSubmit={handleSubmit} className="flex gap-2 max-w-lg">
             <Input
               type="email"
               value={email}
@@ -40,10 +80,11 @@ const NewsletterSection = () => {
             />
             <Button
               type="submit"
-              size="icon"
+              disabled={newsletterMutation.isPending}
               className="rounded-full bg-card text-primary hover:bg-card/90 shrink-0"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4 mr-2" />
+              {newsletterMutation.isPending ? "Saving..." : "Subscribe"}
             </Button>
           </form>
         </div>

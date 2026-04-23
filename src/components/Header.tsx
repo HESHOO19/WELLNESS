@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Bell,
+  LayoutDashboard,
+  LogOut,
+  Search,
+  ShoppingBag,
+  ShoppingCart,
+  Store,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCart } from "@/contexts/CartContext";
-import logo from "@/assets/wellness_logo.svg";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import { Bell, Search, ShoppingCart, User, X, LogOut, Store, ShoppingBag } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,21 +23,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSupplierSubscriptions } from "@/hooks/use-marketplace";
+import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/wellness_logo.svg";
 
 interface HeaderProps {
   onSearch?: (term: string) => void;
   onCartOpen?: () => void;
 }
 
-type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
-type ProductRow = Database["public"]["Tables"]["products"]["Row"];
-type SupplierOrderRow = Database["public"]["Tables"]["supplier_orders"]["Row"];
-
-type BuyerSupplierNotification = Pick<SupplierOrderRow, "id" | "status" | "supplier_name" | "created_at" | "order_id"> & {
-  orders: Pick<OrderRow, "id" | "created_at" | "total"> | null;
+type NotificationOrder = {
+  id: string;
+  status: string;
+  supplier_name: string | null;
+  created_at: string;
+  total: number;
 };
-type ProductNotification = Pick<ProductRow, "id" | "name" | "price" | "created_at">;
-type SupplierOrderNotification = Pick<SupplierOrderRow, "id" | "status" | "created_at" | "order_id" | "supplier_name">;
+
+type NotificationProduct = {
+  id: string;
+  name: string;
+  price: number;
+  created_at: string;
+};
 
 const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
   const { totalItems } = useCart();
@@ -41,76 +57,79 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const isBuyer = accountType === "buyer";
   const isSupplier = accountType === "supplier";
-  const showNotifications = !!user && (isBuyer || isSupplier);
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: pendingConfirmations = [], isLoading: pendingConfirmationsLoading } = useQuery<BuyerSupplierNotification[]>({
-    queryKey: ["notifications", "buyer-pending-confirmations", user?.id],
+  const { data: subscriptions = [] } = useSupplierSubscriptions(user?.id, !!user && isBuyer);
+  const subscribedSupplierIds = subscriptions.map((subscription) => subscription.supplier_id);
+
+  const { data: buyerPendingOrders = [] } = useQuery<NotificationOrder[]>({
+    queryKey: ["header", "buyer-pending-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("supplier_orders")
-        .select("id, status, supplier_name, created_at, order_id, orders!inner(id, created_at, total, user_id)")
+        .from("orders")
+        .select("id, status, supplier_name, created_at, total")
+        .eq("user_id", user!.id)
         .eq("status", "pending")
-        .eq("orders.user_id", user!.id)
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
-      return (data ?? []) as BuyerSupplierNotification[];
+      return (data ?? []) as NotificationOrder[];
     },
     enabled: !!user && isBuyer,
   });
 
-  const { data: confirmedSuppliers = [], isLoading: confirmedSuppliersLoading } = useQuery<BuyerSupplierNotification[]>({
-    queryKey: ["notifications", "buyer-confirmed-suppliers", user?.id],
+  const { data: buyerActiveOrders = [] } = useQuery<NotificationOrder[]>({
+    queryKey: ["header", "buyer-active-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("supplier_orders")
-        .select("id, status, supplier_name, created_at, order_id, orders!inner(id, created_at, total, user_id)")
+        .from("orders")
+        .select("id, status, supplier_name, created_at, total")
+        .eq("user_id", user!.id)
         .in("status", ["confirmed", "shipped", "delivered"])
-        .eq("orders.user_id", user!.id)
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
-      return (data ?? []) as BuyerSupplierNotification[];
+      return (data ?? []) as NotificationOrder[];
     },
     enabled: !!user && isBuyer,
   });
 
-  const { data: newProducts = [], isLoading: newProductsLoading } = useQuery<ProductNotification[]>({
-    queryKey: ["notifications", "buyer-new-products"],
+  const { data: supplierPendingOrders = [] } = useQuery<NotificationOrder[]>({
+    queryKey: ["header", "supplier-pending-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("products")
-        .select("id, name, price, created_at")
-        .gte("created_at", sevenDaysAgo)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return (data ?? []) as ProductNotification[];
-    },
-    enabled: isBuyer,
-  });
-
-  const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<SupplierOrderNotification[]>({
-    queryKey: ["notifications", "supplier-pending-orders", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("supplier_orders")
-        .select("id, status, created_at, order_id, supplier_name")
+        .from("orders")
+        .select("id, status, supplier_name, created_at, total")
         .eq("supplier_id", user!.id)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
-      return (data ?? []) as SupplierOrderNotification[];
+      return (data ?? []) as NotificationOrder[];
     },
     enabled: !!user && isSupplier,
   });
 
+  const { data: newArrivalNotifications = [] } = useQuery<NotificationProduct[]>({
+    queryKey: ["header", "buyer-new-arrivals", subscribedSupplierIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, price, created_at")
+        .in("supplier_id", subscribedSupplierIds)
+        .gte("created_at", sevenDaysAgo)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as NotificationProduct[];
+    },
+    enabled: !!user && isBuyer && subscribedSupplierIds.length > 0,
+  });
+
   const notificationCount = isBuyer
-    ? pendingConfirmations.length + confirmedSuppliers.length + newProducts.length
+    ? buyerPendingOrders.length + buyerActiveOrders.length + newArrivalNotifications.length
     : isSupplier
-      ? pendingOrders.length
+      ? supplierPendingOrders.length
       : 0;
 
   const handleSearch = (value: string) => {
@@ -123,18 +142,21 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
     navigate("/");
   };
 
+  const dashboardHref = isSupplier ? "/supplier" : "/orders";
+  const searchPlaceholder = isSupplier ? "Search your products..." : "Search medicines, vitamins...";
+
   return (
     <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-4">
+        <Link to="/" className="flex items-center gap-2 shrink-0">
           <img src={logo} alt="WELLNESS" className="h-8" />
         </Link>
 
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="hidden md:flex flex-1 max-w-md">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search medicines, vitamins..."
+              placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10 rounded-full bg-secondary border-0 focus-visible:ring-primary/30"
@@ -142,21 +164,32 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSearchOpen(!searchOpen)}>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSearchOpen((open) => !open)}>
             {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </Button>
 
-          <Button variant="ghost" size="icon" onClick={onCartOpen} className="relative">
-            <ShoppingCart className="h-5 w-5" />
-            {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full gradient-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                {totalItems}
-              </span>
-            )}
-          </Button>
+          {user && (
+            <Link to={dashboardHref} className="hidden sm:block">
+              <Button variant="outline" size="sm" className="rounded-full">
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+          )}
 
-          {showNotifications && (
+          {!isSupplier && (
+            <Button variant="ghost" size="icon" onClick={onCartOpen} className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full gradient-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                  {totalItems}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {user && (isBuyer || isSupplier) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
@@ -171,56 +204,47 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
               <DropdownMenuContent align="end" className="w-80 p-2">
                 <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+
                 {isBuyer ? (
                   <div className="space-y-2">
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Pending Confirmations</div>
-                    {pendingConfirmationsLoading ? (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading pending confirmations...</div>
-                    ) : pendingConfirmations.length ? (
-                      pendingConfirmations.map((supplierOrder) => (
-                        <DropdownMenuItem key={supplierOrder.id} onSelect={() => navigate("/orders")}> 
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Pending Orders</div>
+                    {buyerPendingOrders.length ? (
+                      buyerPendingOrders.map((order) => (
+                        <DropdownMenuItem key={order.id} onSelect={() => navigate("/orders")}>
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium">Order #{supplierOrder.order_id.slice(0, 8)}</span>
+                            <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
                             <span className="text-[10px] text-muted-foreground">
-                              Waiting for {supplierOrder.supplier_name}
+                              Waiting for {order.supplier_name ?? "supplier"}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No pending confirmations.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No pending orders.</div>
                     )}
 
                     <DropdownMenuSeparator />
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Confirmed Suppliers</div>
-                    {confirmedSuppliersLoading ? (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading confirmations...</div>
-                    ) : confirmedSuppliers.length ? (
-                      confirmedSuppliers.map((supplierOrder) => (
-                        <DropdownMenuItem key={supplierOrder.id} onSelect={() => navigate("/orders")}> 
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Supplier Updates</div>
+                    {buyerActiveOrders.length ? (
+                      buyerActiveOrders.map((order) => (
+                        <DropdownMenuItem key={order.id} onSelect={() => navigate("/orders")}>
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium">Order #{supplierOrder.order_id.slice(0, 8)}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {supplierOrder.supplier_name} · {supplierOrder.status}
+                            <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
+                            <span className="text-[10px] text-muted-foreground capitalize">
+                              {order.supplier_name ?? "Supplier"} · {order.status}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No supplier confirmations yet.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">No supplier updates yet.</div>
                     )}
 
-                    <DropdownMenuItem onSelect={() => navigate("/orders")} className="text-xs text-primary">
-                      Open buyer dashboard
-                    </DropdownMenuItem>
-
                     <DropdownMenuSeparator />
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Products (last 7 days)</div>
-                    {newProductsLoading ? (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading new products...</div>
-                    ) : newProducts.length ? (
-                      newProducts.map((product) => (
-                        <DropdownMenuItem key={product.id} onSelect={() => navigate("/shop")}> 
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Arrivals</div>
+                    {newArrivalNotifications.length ? (
+                      newArrivalNotifications.map((product) => (
+                        <DropdownMenuItem key={product.id} onSelect={() => navigate(`/products/${product.id}`)}>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium">{product.name}</span>
                             <span className="text-[10px] text-muted-foreground">
@@ -230,36 +254,28 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No new products this week.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">
+                        Subscribe to suppliers to see tailored new arrivals.
+                      </div>
                     )}
-
-                    <DropdownMenuItem onSelect={() => navigate("/shop")} className="text-xs text-primary">
-                      Browse the catalog
-                    </DropdownMenuItem>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Order Requests</div>
-                    {pendingLoading ? (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">Loading incoming orders...</div>
-                    ) : pendingOrders.length ? (
-                      pendingOrders.map((order) => {
-                        return (
-                          <DropdownMenuItem key={order.id} onSelect={() => navigate("/supplier")}>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-medium">Order #{order.order_id.slice(0, 8)}</span>
-                              <span className="text-[10px] text-muted-foreground">Waiting for your confirmation</span>
-                            </div>
-                          </DropdownMenuItem>
-                        );
-                      })
+                    {supplierPendingOrders.length ? (
+                      supplierPendingOrders.map((order) => (
+                        <DropdownMenuItem key={order.id} onSelect={() => navigate("/supplier?tab=orders")}>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Review payment and fulfilment details
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
                     ) : (
                       <div className="px-2 pb-1 text-xs text-muted-foreground">No new order requests.</div>
                     )}
-
-                    <DropdownMenuItem onSelect={() => navigate("/supplier")} className="text-xs text-primary">
-                      Open supplier dashboard
-                    </DropdownMenuItem>
                   </div>
                 )}
               </DropdownMenuContent>
@@ -279,19 +295,39 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs text-muted-foreground cursor-default capitalize">
                   <span className="flex items-center gap-1">
-                    {accountType === "supplier" ? <Store className="h-3 w-3" /> : <ShoppingBag className="h-3 w-3" />}
+                    {isSupplier ? <Store className="h-3 w-3" /> : <ShoppingBag className="h-3 w-3" />}
                     {accountType ?? "buyer"} account
                   </span>
                 </DropdownMenuItem>
-                {accountType === "supplier" ? (
-                  <DropdownMenuItem onClick={() => navigate("/supplier")}>
-                    <Store className="h-4 w-4 mr-2" /> Supplier Dashboard
-                  </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
+                {isSupplier ? (
+                  <>
+                    <DropdownMenuItem onClick={() => navigate("/supplier")}>
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/supplier?tab=products")}>
+                      <Store className="h-4 w-4 mr-2" /> My Products
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/supplier?tab=orders")}>
+                      <ShoppingBag className="h-4 w-4 mr-2" /> My Orders
+                    </DropdownMenuItem>
+                  </>
                 ) : (
-                  <DropdownMenuItem onClick={() => navigate("/orders")}>
-                    <ShoppingBag className="h-4 w-4 mr-2" /> My Orders
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => navigate("/orders")}>
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/suppliers")}>
+                      <Users className="h-4 w-4 mr-2" /> Suppliers
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/shop")}>
+                      <ShoppingBag className="h-4 w-4 mr-2" /> Browse Products
+                    </DropdownMenuItem>
+                  </>
                 )}
+
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="h-4 w-4 mr-2" /> Sign out
                 </DropdownMenuItem>
@@ -312,7 +348,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search medicines, vitamins..."
+              placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10 rounded-full bg-secondary border-0"

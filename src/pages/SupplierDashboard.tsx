@@ -1,57 +1,61 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { useCategories } from "@/hooks/use-products";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  BarChart3,
+  Boxes,
+  DollarSign,
+  Loader2,
+  Package,
+  Pencil,
+  Plus,
+  ShoppingCart,
+  Trash2,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ImageUpload from "@/components/ImageUpload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import ImageUpload from "@/components/ImageUpload";
-import { Plus, Package, ShoppingCart, Pencil, Trash2, Loader2, X, DollarSign, TrendingUp } from "lucide-react";
+import { useCategories } from "@/hooks/use-products";
+import {
+  getProductMetrics,
+  useSupplierOrders,
+  useSupplierProducts,
+} from "@/hooks/use-marketplace";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 const statusOptions: OrderStatus[] = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
 
-const statusCls = (s: OrderStatus) =>
-  s === "pending" ? "bg-yellow-500/10 text-yellow-600" :
-  s === "confirmed" ? "bg-blue-500/10 text-blue-600" :
-  s === "shipped" ? "bg-purple-500/10 text-purple-600" :
-  s === "delivered" ? "bg-green-500/10 text-green-600" :
-  "bg-destructive/10 text-destructive";
-
-type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
-type ProductRow = Database["public"]["Tables"]["products"]["Row"];
-type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
-type OrderItemRow = Database["public"]["Tables"]["order_items"]["Row"];
-
-type ProductWithCategory = ProductRow & {
-  categories: Pick<CategoryRow, "name" | "slug"> | null;
-};
-
-type OrderItemWithProduct = OrderItemRow & {
-  products: Pick<ProductRow, "name" | "supplier_id" | "image_url"> | null;
-};
-
-type SupplierOrder = OrderRow & {
-  order_items: OrderItemWithProduct[];
-};
+const statusCls = (status: OrderStatus) =>
+  status === "pending"
+    ? "bg-yellow-500/10 text-yellow-600"
+    : status === "confirmed"
+      ? "bg-blue-500/10 text-blue-600"
+      : status === "shipped"
+        ? "bg-purple-500/10 text-purple-600"
+        : status === "delivered"
+          ? "bg-green-500/10 text-green-600"
+          : "bg-destructive/10 text-destructive";
 
 const SupplierDashboard = () => {
-  const { user, accountType } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: categories } = useCategories();
+  const { toast } = useToast();
+  const { user, accountType } = useAuth();
+  const { data: categories = [] } = useCategories();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -61,122 +65,36 @@ const SupplierDashboard = () => {
   const [unit, setUnit] = useState("piece");
   const [minOrder, setMinOrder] = useState("1");
 
+  const tab = searchParams.get("tab") ?? "dashboard";
   const isSupplier = accountType === "supplier";
 
-  const { data: myProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ["supplier-products", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, categories(name, slug)")
-        .eq("supplier_id", user!.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as ProductWithCategory[];
-    },
-    enabled: !!user && isSupplier,
-  });
+  const { data: myProducts = [], isLoading: productsLoading } = useSupplierProducts(user?.id, !!user && isSupplier);
+  const { data: myOrders = [], isLoading: ordersLoading } = useSupplierOrders(user?.id, !!user && isSupplier);
 
-  const { data: myOrders, error: ordersError } = useQuery({
-    queryKey: ["supplier-orders", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*, order_items!inner(*, products!inner(name, supplier_id, image_url))")
-        .eq("supplier_id", user!.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SupplierOrder[];
-    },
-    enabled: !!user && isSupplier,
-  });
+  const metricsByProduct = useMemo(() => {
+    return new Map(
+      myProducts.map((product) => [product.id, getProductMetrics(myOrders, product.id)]),
+    );
+  }, [myOrders, myProducts]);
 
-  useEffect(() => {
-    if (!ordersError) return;
-    const message = ordersError instanceof Error ? ordersError.message : "Unable to load orders.";
-    toast({ title: "Unable to load orders", description: message, variant: "destructive" });
-  }, [ordersError, toast]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        name,
-        description,
-        price: parseFloat(price),
-        category_id: categoryId || null,
-        image_url: imageUrl || null,
-        stock: parseInt(stock) || 0,
-        unit,
-        min_order: parseInt(minOrder) || 1,
-        supplier_id: user!.id,
-      };
-      if (editingId) {
-        const { error } = await supabase.from("products").update(payload).eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("products").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: editingId ? "Product updated" : "Product added" });
-      resetForm();
-    },
-    onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : "Unable to save product.";
-      toast({ title: "Error", description: message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "Product deleted" });
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: OrderStatus }) => {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status })
-        .eq("id", orderId);
-      if (error) throw error;
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
-      toast({ title: "Order status updated" });
-      if (["confirmed", "shipped", "delivered"].includes(variables.status)) {
-        supabase.functions
-          .invoke("notify-order-status", {
-            body: { orderId: variables.orderId, status: variables.status },
-          })
-          .catch(() => {
-            // Email failures should not block status updates.
-          });
-      }
-    },
-    onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : "Unable to update status.";
-      toast({ title: "Update failed", description: message, variant: "destructive" });
-    },
-  });
+  const revenue = myOrders.reduce((sum, order) => sum + Number(order.total), 0);
+  const lowStockCount = myProducts.filter((product) => product.stock < 10).length;
+  const activeProducts = myProducts.filter((product) => product.is_active).length;
 
   const resetForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setName(""); setDescription(""); setPrice(""); setCategoryId("");
-    setImageUrl(""); setStock(""); setUnit("piece"); setMinOrder("1");
+    setName("");
+    setDescription("");
+    setPrice("");
+    setCategoryId("");
+    setImageUrl("");
+    setStock("");
+    setUnit("piece");
+    setMinOrder("1");
   };
 
-  const startEdit = (product: ProductWithCategory) => {
+  const startEdit = (product: (typeof myProducts)[number]) => {
     setEditingId(product.id);
     setName(product.name);
     setDescription(product.description ?? "");
@@ -187,252 +105,511 @@ const SupplierDashboard = () => {
     setUnit(product.unit);
     setMinOrder(String(product.min_order));
     setShowForm(true);
+    setSearchParams({ tab: "products" });
   };
 
-  // Stats
-  const revenue = (myOrders ?? []).reduce((sum, order) => {
-    return sum + order.order_items.reduce((itemSum, item) => itemSum + Number(item.unit_price) * item.quantity, 0);
-  }, 0);
-  const pendingCount = (myOrders ?? []).filter((order) => order.status === "pending").length;
-  const lowStockCount = (myProducts ?? []).filter((product) => product.stock < 10).length;
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name,
+        description,
+        price: Number(price),
+        category_id: categoryId || null,
+        image_url: imageUrl || null,
+        stock: Number(stock),
+        unit,
+        min_order: Number(minOrder),
+        supplier_id: user!.id,
+      };
+
+      if (editingId) {
+        const { error } = await supabase.from("products").update(payload).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("products").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["supplier-products", user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+      ]);
+      toast({ title: editingId ? "Product updated" : "Product added" });
+      resetForm();
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Unable to save product.";
+      toast({ title: "Save failed", description: message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase.from("products").delete().eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["supplier-products", user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+      ]);
+      toast({ title: "Product deleted" });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Unable to delete product.";
+      toast({ title: "Delete failed", description: message, variant: "destructive" });
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: OrderStatus }) => {
+      const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+      if (error) throw error;
+    },
+    onSuccess: async (_value, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["supplier-orders", user?.id] });
+      toast({ title: "Order status updated" });
+      if (["confirmed", "shipped", "delivered"].includes(variables.status)) {
+        supabase.functions
+          .invoke("notify-order-status", {
+            body: { orderId: variables.orderId, status: variables.status },
+          })
+          .catch(() => undefined);
+      }
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Unable to update order status.";
+      toast({ title: "Update failed", description: message, variant: "destructive" });
+    },
+  });
 
   if (!isSupplier) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-          <Package className="h-20 w-20 text-muted-foreground/30 mx-auto mb-4" />
-          <h1 className="font-heading text-2xl font-bold mb-2">Supplier Access Only</h1>
-          <p className="text-muted-foreground mb-6">This dashboard is for supplier accounts only.</p>
-          <Button onClick={() => navigate("/")} variant="hero">Go Home</Button>
-        </div>
+        <main className="max-w-3xl mx-auto px-4 md:px-6 py-20 text-center">
+          <Package className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+          <h1 className="font-heading text-3xl font-extrabold">Supplier access only</h1>
+          <p className="text-muted-foreground mt-3">
+            This area is reserved for supplier accounts managing listings and fulfilment.
+          </p>
+          <Button className="rounded-full mt-6" onClick={() => navigate("/")}>
+            Go Home
+          </Button>
+        </main>
         <Footer />
       </div>
     );
   }
+
+  const renderProductForm = () =>
+    showForm && (
+      <div className="glass-card-elevated rounded-3xl p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-heading text-xl font-bold">{editingId ? "Edit Product" : "Add Product"}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Keep your listing sharp so buyers understand the stock, pricing, and terms immediately.
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={resetForm}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <Label className="mb-2 block">Product Image</Label>
+            <ImageUpload value={imageUrl} onChange={setImageUrl} />
+          </div>
+          <div>
+            <Label>Product Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Category</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.icon} {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-2">
+            <Label>Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Price</Label>
+            <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" min="0" step="0.01" />
+          </div>
+          <div>
+            <Label>Stock</Label>
+            <Input type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="mt-1" min="0" />
+          </div>
+          <div>
+            <Label>Unit</Label>
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Minimum Order</Label>
+            <Input type="number" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} className="mt-1" min="1" />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" className="rounded-full" onClick={resetForm}>
+            Cancel
+          </Button>
+          <Button
+            className="rounded-full gradient-primary text-primary-foreground"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending || !name || !price}
+          >
+            {saveMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}
+          </Button>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
           <div>
-            <h1 className="font-heading text-3xl font-extrabold">Supplier Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Manage your products and orders</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-primary">Supplier Workspace</p>
+            <h1 className="font-heading text-3xl font-extrabold mt-2">Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Track demand, update listings, and manage every order requested from your catalog.
+            </p>
           </div>
-          {!showForm && (
-            <Button onClick={() => setShowForm(true)} className="rounded-full gradient-primary text-primary-foreground font-bold">
-              <Plus className="h-4 w-4 mr-1" /> Add Product
+
+          <div className="flex gap-2 flex-wrap">
+            <Button variant={tab === "dashboard" ? "default" : "outline"} className="rounded-full" onClick={() => setSearchParams({ tab: "dashboard" })}>
+              Dashboard
             </Button>
-          )}
+            <Button variant={tab === "products" ? "default" : "outline"} className="rounded-full" onClick={() => setSearchParams({ tab: "products" })}>
+              My Products
+            </Button>
+            <Button variant={tab === "orders" ? "default" : "outline"} className="rounded-full" onClick={() => setSearchParams({ tab: "orders" })}>
+              My Orders
+            </Button>
+            {!showForm && (
+              <Button className="rounded-full gradient-primary text-primary-foreground" onClick={() => {
+                setShowForm(true);
+                setSearchParams({ tab: "products" });
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="glass-card-elevated rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Revenue</p>
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">Revenue</p>
               <DollarSign className="h-4 w-4 text-primary" />
             </div>
-            <p className="font-heading text-2xl font-extrabold">EGP {revenue.toLocaleString()}</p>
+            <p className="font-heading text-2xl font-extrabold mt-2">EGP {revenue.toLocaleString()}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Orders</p>
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">Orders</p>
               <ShoppingCart className="h-4 w-4 text-primary" />
             </div>
-            <p className="font-heading text-2xl font-extrabold">{myOrders?.length ?? 0}</p>
-            <p className="text-muted-foreground text-[10px] mt-0.5">{pendingCount} pending</p>
+            <p className="font-heading text-2xl font-extrabold mt-2">{myOrders.length}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Products</p>
-              <Package className="h-4 w-4 text-primary" />
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">Active Products</p>
+              <Boxes className="h-4 w-4 text-primary" />
             </div>
-            <p className="font-heading text-2xl font-extrabold">{myProducts?.length ?? 0}</p>
+            <p className="font-heading text-2xl font-extrabold mt-2">{activeProducts}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Low Stock</p>
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">Low Stock</p>
               <TrendingUp className="h-4 w-4 text-destructive" />
             </div>
-            <p className="font-heading text-2xl font-extrabold">{lowStockCount}</p>
+            <p className="font-heading text-2xl font-extrabold mt-2">{lowStockCount}</p>
           </div>
         </div>
 
-        {/* Product Form */}
-        {showForm && (
-          <div className="glass-card-elevated rounded-2xl p-6 mb-8 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading font-bold text-lg">{editingId ? "Edit Product" : "Add New Product"}</h2>
-              <Button variant="ghost" size="icon" onClick={resetForm}><X className="h-4 w-4" /></Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <Label className="mb-2 block">Product Image</Label>
-                <ImageUpload value={imageUrl} onChange={setImageUrl} />
+        {tab === "products" && renderProductForm()}
+
+        {tab === "dashboard" && (
+          <div className="grid xl:grid-cols-[1.1fr_0.9fr] gap-6">
+            <section className="glass-card-elevated rounded-3xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h2 className="font-heading text-xl font-bold">Top Product Insights</h2>
               </div>
-              <div>
-                <Label>Product Name</Label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Vitamin D3 5000IU" className="mt-1" required />
+
+              {productsLoading ? (
+                <div className="py-10 flex justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : myProducts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-muted-foreground">
+                  Add your first product to start measuring demand and profit.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myProducts.slice(0, 4).map((product) => {
+                    const metrics = metricsByProduct.get(product.id);
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => navigate(`/products/${product.id}`)}
+                        className="w-full text-left glass-card rounded-2xl p-4 hover:shadow-elevated transition-all"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-bold">{product.name}</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {product.stock} in stock · EGP {Number(product.price).toLocaleString()}
+                            </p>
+                          </div>
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                            Insights
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Demand</p>
+                            <p className="font-semibold mt-1">{metrics?.unitsSold ?? 0} units</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Profit</p>
+                            <p className="font-semibold mt-1">EGP {(metrics?.revenue ?? 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Orders</p>
+                            <p className="font-semibold mt-1">{metrics?.orderCount ?? 0}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="glass-card-elevated rounded-3xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <ShoppingCart className="h-5 w-5 text-primary" />
+                <h2 className="font-heading text-xl font-bold">Latest Orders</h2>
               </div>
-              <div>
-                <Label>Category</Label>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {(categories ?? []).map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="md:col-span-2">
-                <Label>Description</Label>
-                <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief product description" className="mt-1" />
-              </div>
-              <div>
-                <Label>Price (EGP)</Label>
-                <Input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="mt-1" min="0" step="0.01" required />
-              </div>
-              <div>
-                <Label>Stock Quantity</Label>
-                <Input type="number" value={stock} onChange={e => setStock(e.target.value)} placeholder="0" className="mt-1" min="0" required />
-              </div>
-              <div>
-                <Label>Unit</Label>
-                <Select value={unit} onValueChange={setUnit}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["piece", "box", "bottle", "pack", "tube", "tub"].map(u => (
-                      <SelectItem key={u} value={u}>{u}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Min. Order Qty</Label>
-                <Input type="number" value={minOrder} onChange={e => setMinOrder(e.target.value)} placeholder="1" className="mt-1" min="1" required />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={resetForm} className="rounded-full">Cancel</Button>
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !name || !price} className="rounded-full gradient-primary text-primary-foreground font-bold">
-                {saveMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}
-              </Button>
-            </div>
+
+              {ordersLoading ? (
+                <div className="py-10 flex justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : myOrders.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-muted-foreground">
+                  Orders from buyers will appear here as soon as they come in.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myOrders.slice(0, 4).map((order) => (
+                    <div key={order.id} className="glass-card rounded-2xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-sm">Order #{order.id.slice(0, 8)}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {new Date(order.created_at).toLocaleDateString()} · {order.payment_method === "cod" ? "Cash on Delivery" : "Online Payment"}
+                          </p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${statusCls(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-3">
+                        <span className="text-muted-foreground">{order.order_items.length} line items</span>
+                        <span className="font-semibold">EGP {Number(order.total).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
 
-        {/* My Products */}
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Package className="h-5 w-5 text-primary" />
-            <h2 className="font-heading font-bold text-lg">My Products ({myProducts?.length ?? 0})</h2>
-          </div>
-
-          {productsLoading ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : !myProducts?.length ? (
-            <div className="glass-card rounded-2xl p-8 text-center text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-2 opacity-30" />
-              <p>No products yet. Click "Add Product" to get started.</p>
+        {tab === "products" && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-5 w-5 text-primary" />
+              <h2 className="font-heading text-2xl font-bold">My Products</h2>
             </div>
-          ) : (
-            <div className="grid gap-3">
-              {myProducts.map((product) => (
-                <div key={product.id} className="glass-card rounded-xl p-4 flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-lg bg-secondary overflow-hidden flex-shrink-0">
-                    {product.image_url ? (
-                      <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl">📦</div>
+
+            {productsLoading ? (
+              <div className="py-10 flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : myProducts.length === 0 ? (
+              <div className="glass-card rounded-3xl p-10 text-muted-foreground">
+                You have not listed any products yet. Add one to start tracking demand and profit.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {myProducts.map((product) => {
+                  const metrics = metricsByProduct.get(product.id);
+                  return (
+                    <div key={product.id} className="glass-card-elevated rounded-3xl p-5">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex items-start gap-4">
+                          <div className="w-16 h-16 rounded-2xl bg-secondary overflow-hidden shrink-0">
+                            {product.image_url ? (
+                              <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">Rx</div>
+                            )}
+                          </div>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/products/${product.id}`)}
+                              className="font-heading text-lg font-bold hover:text-primary transition-colors text-left"
+                            >
+                              {product.name}
+                            </button>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {product.categories?.name ?? "Uncategorized"} · {product.stock} in stock · EGP {Number(product.price).toLocaleString()}
+                            </p>
+                            <div className="grid sm:grid-cols-3 gap-3 mt-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Demand</p>
+                                <p className="font-semibold mt-1">{metrics?.unitsSold ?? 0} units sold</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Profit</p>
+                                <p className="font-semibold mt-1">EGP {(metrics?.revenue ?? 0).toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-[11px] uppercase tracking-[0.2em]">Orders</p>
+                                <p className="font-semibold mt-1">{metrics?.orderCount ?? 0}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button variant="outline" className="rounded-full" onClick={() => startEdit(product)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-full text-destructive hover:text-destructive"
+                            onClick={() => deleteMutation.mutate(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === "orders" && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              <h2 className="font-heading text-2xl font-bold">My Orders</h2>
+            </div>
+
+            {ordersLoading ? (
+              <div className="py-10 flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : myOrders.length === 0 ? (
+              <div className="glass-card rounded-3xl p-10 text-muted-foreground">
+                No buyer orders yet. Once pharmacies place requests from your listings, they will appear here with payment and status details.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {myOrders.map((order) => (
+                  <div key={order.id} className="glass-card-elevated rounded-3xl p-5">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="font-bold text-sm">Order #{order.id.slice(0, 8)}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {new Date(order.created_at).toLocaleDateString()} · {order.payment_method === "cod" ? "Cash on Delivery" : "Online Payment"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${statusCls(order.status)}`}>
+                          {order.status}
+                        </span>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) =>
+                            updateStatusMutation.mutate({ orderId: order.id, status: value as OrderStatus })
+                          }
+                        >
+                          <SelectTrigger className="h-9 w-[150px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map((status) => (
+                              <SelectItem key={status} value={status} className="capitalize text-xs">
+                                {status}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      {order.order_items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => item.products?.id && navigate(`/products/${item.products.id}`)}
+                          className="w-full text-left flex items-center justify-between gap-3 rounded-2xl border border-border px-4 py-3 hover:border-primary/40 transition-colors"
+                        >
+                          <div>
+                            <p className="font-medium">{item.products?.name ?? "Product"}</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Qty {item.quantity}
+                            </p>
+                          </div>
+                          <span className="font-semibold">EGP {(Number(item.unit_price) * item.quantity).toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {order.delivery_address && (
+                      <p className="text-sm text-muted-foreground mt-4 pt-4 border-t border-border">
+                        Delivery to {order.delivery_address}, {order.delivery_city} · {order.delivery_phone}
+                      </p>
                     )}
                   </div>
-                  <div className="flex-grow min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm truncate">{product.name}</h3>
-                      <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {product.categories?.name ?? "Uncategorized"}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground text-xs">
-                      EGP {Number(product.price).toLocaleString()} · {product.stock} in stock · Min. {product.min_order} {product.unit}s
-                    </p>
-                  </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(product)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate(product.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Incoming Orders */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingCart className="h-5 w-5 text-primary" />
-            <h2 className="font-heading font-bold text-lg">Incoming Orders ({myOrders?.length ?? 0})</h2>
-          </div>
-
-          {!myOrders?.length ? (
-            <div className="glass-card rounded-2xl p-8 text-center text-muted-foreground">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-30" />
-              <p>No orders yet. Orders will appear here when buyers purchase your products.</p>
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {myOrders.map((order) => (
-                <div key={order.id} className="glass-card rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-                    <div>
-                      <span className="font-bold text-sm">Order #{order.id.slice(0, 8)}</span>
-                      <span className="text-muted-foreground text-xs ml-2">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${statusCls(order.status)}`}>
-                        {order.status}
-                      </span>
-                      <Select
-                        value={order.status}
-                        onValueChange={(v) => updateStatusMutation.mutate({ orderId: order.id, status: v as OrderStatus })}
-                      >
-                        <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(s => (
-                            <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-1 mb-2">
-                    {order.order_items.map((oi) => (
-                      <div key={oi.id} className="flex justify-between text-xs text-muted-foreground">
-                        <span>{oi.products?.name} × {oi.quantity}</span>
-                        <span className="font-medium text-foreground">EGP {(Number(oi.unit_price) * oi.quantity).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {order.delivery_address && (
-                    <p className="text-muted-foreground text-[11px] pt-2 border-t border-border">
-                      📍 {order.delivery_address}, {order.delivery_city} · {order.delivery_phone}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       <Footer />

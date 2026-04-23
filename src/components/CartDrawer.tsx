@@ -1,6 +1,6 @@
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +26,9 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
             <ShoppingBag className="h-5 w-5 text-primary" />
             Cart ({totalItems})
           </SheetTitle>
+          <SheetDescription>
+            Review the products in your cart, adjust quantities, and continue to checkout when you are ready.
+          </SheetDescription>
         </SheetHeader>
 
         {items.length === 0 ? (
