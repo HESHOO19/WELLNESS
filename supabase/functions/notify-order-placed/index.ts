@@ -104,11 +104,12 @@ serve(async (req) => {
 
   const itemsBySupplier = new Map<string, Array<{ name: string; quantity: number; unit_price: number }>>();
   (orderItems ?? []).forEach((item) => {
-    const supplierId = item.products?.supplier_id;
-    if (!supplierId || !item.products?.name) return;
+    const product = Array.isArray(item.products) ? item.products[0] : item.products;
+    const supplierId = product?.supplier_id;
+    if (!supplierId || !product?.name) return;
     const items = itemsBySupplier.get(supplierId) ?? [];
     items.push({
-      name: item.products.name,
+      name: product.name,
       quantity: item.quantity,
       unit_price: Number(item.unit_price),
     });

@@ -54,7 +54,7 @@ export const toProductCardModel = (product: ProductWithSupplier | ProductWithCat
     min_order: product.min_order,
     supplier_id: product.supplier_id,
     supplier_name:
-      supplier?.business_name?.trim() || supplier?.email || ("supplier_name" in product ? product.supplier_name : null),
+      (supplier?.business_name?.trim() || supplier?.email || ("supplier_name" in product ? product.supplier_name : null)) as string | null,
     created_at: product.created_at,
   };
 };
