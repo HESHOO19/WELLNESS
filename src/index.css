@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 210 40% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 40% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 8%;
+
+    --primary: 205 100% 32%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 95%;
+    --secondary-foreground: 210 40% 8%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 10% 45%;
+
+    --accent: 340 70% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 205 100% 32%;
+
+    --radius: 0.75rem;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 205 100% 32%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 30% 95%;
+    --sidebar-accent-foreground: 210 40% 8%;
+    --sidebar-border: 210 20% 90%;
+    --sidebar-ring: 205 100% 32%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(205, 100%, 32%), hsl(205, 80%, 45%));
+    --gradient-hero: linear-gradient(135deg, hsl(205, 100%, 32%), hsl(220, 70%, 25%));
+    --gradient-accent: linear-gradient(135deg, hsl(340, 70%, 38%), hsl(340, 60%, 50%));
+    --shadow-card: 0 1px 3px 0 hsl(210 20% 8% / 0.06), 0 1px 2px -1px hsl(210 20% 8% / 0.06);
+    --shadow-elevated: 0 10px 25px -5px hsl(210 20% 8% / 0.08), 0 8px 10px -6px hsl(210 20% 8% / 0.04);
+    --shadow-glow: 0 0 30px -5px hsl(205 100% 32% / 0.2);
+  }
+
+  .dark {
+    --background: 210 40% 4%;
+    --foreground: 210 20% 96%;
+    --card: 210 35% 8%;
+    --card-foreground: 210 20% 96%;
+    --popover: 210 35% 8%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 205 90% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 30% 14%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 210 30% 14%;
+    --muted-foreground: 210 15% 60%;
+    --accent: 340 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 20% 96%;
+    --border: 210 30% 16%;
+    --input: 210 30% 16%;
+    --ring: 205 90% 50%;
+    --sidebar-background: 210 35% 6%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 205 90% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 30% 14%;
+    --sidebar-accent-foreground: 210 20% 96%;
+    --sidebar-border: 210 30% 16%;
+    --sidebar-ring: 205 90% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Manrope', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/70 backdrop-blur-xl border border-border/50;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-card-elevated {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out both;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
