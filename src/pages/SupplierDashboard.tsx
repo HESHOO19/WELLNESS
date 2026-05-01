@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useCategories } from "@/hooks/use-products";
 import {
   getProductMetrics,
@@ -52,6 +53,7 @@ const SupplierDashboard = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user, accountType, loading } = useAuth();
+  const { t, formatNumber } = useLanguage();
   const { data: categories = [] } = useCategories();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
@@ -123,6 +125,32 @@ const SupplierDashboard = () => {
     setMinOrder("1");
   };
 
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "object" && error !== null) {
+      const err = error as Record<string, unknown>;
+      if (typeof err.message === "string") return err.message;
+      if (typeof err.error === "string") return err.error;
+    }
+    return t("Unable to save product.");
+  };
+
+  const normalizedImageUrls = imageUrls.map((url) => url.trim()).filter(Boolean);
+  const parsedPrice = Number(price.trim().replace(/,/g, "."));
+  const parsedStock = Number(stock.trim() || "0");
+  const parsedMinOrder = Number(minOrder.trim() || "1");
+  const isProductFormValid =
+    name.trim().length > 0 &&
+    price.trim().length > 0 &&
+    Number.isFinite(parsedPrice) &&
+    parsedPrice >= 0 &&
+    Number.isFinite(parsedStock) &&
+    parsedStock >= 0 &&
+    Number.isInteger(parsedStock) &&
+    Number.isFinite(parsedMinOrder) &&
+    parsedMinOrder >= 1 &&
+    Number.isInteger(parsedMinOrder);
+
   const startEdit = (product: (typeof myProducts)[number]) => {
     setEditingId(product.id);
     setName(product.name);
@@ -142,17 +170,20 @@ const SupplierDashboard = () => {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const normalizedImageUrls = imageUrls.filter((url) => !!url.trim());
+      if (!isProductFormValid) {
+        throw new Error(t("Please complete all required fields with valid values."));
+      }
+
       const payload = {
-        name,
-        description,
-        price: Number(price),
+        name: name.trim(),
+        description: description.trim() || null,
+        price: parsedPrice,
         category_id: categoryId || null,
         image_url: normalizedImageUrls[0] ?? null,
         image_urls: normalizedImageUrls,
-        stock: Number(stock),
-        unit,
-        min_order: Number(minOrder),
+        stock: parsedStock,
+        unit: unit.trim() || "piece",
+        min_order: parsedMinOrder,
         supplier_id: user!.id,
       };
 
@@ -169,12 +200,12 @@ const SupplierDashboard = () => {
         queryClient.invalidateQueries({ queryKey: ["supplier-products", user?.id] }),
         queryClient.invalidateQueries({ queryKey: ["products"] }),
       ]);
-      toast({ title: editingId ? "Product updated" : "Product added" });
+      toast({ title: editingId ? t("Product updated") : t("Product added") });
       resetForm();
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Unable to save product.";
-      toast({ title: "Save failed", description: message, variant: "destructive" });
+      const message = getErrorMessage(error);
+      toast({ title: t("Save failed"), description: message, variant: "destructive" });
     },
   });
 
@@ -304,37 +335,37 @@ const SupplierDashboard = () => {
             </Select>
           </div>
           <div className="md:col-span-2">
-            <Label>Description</Label>
+            <Label>{t("Description")}</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <Label>Price</Label>
+            <Label>{t("Price")}</Label>
             <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" min="0" step="0.01" />
           </div>
           <div>
-            <Label>Stock</Label>
+            <Label>{t("Stock")}</Label>
             <Input type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="mt-1" min="0" />
           </div>
           <div>
-            <Label>Unit</Label>
+            <Label>{t("Unit")}</Label>
             <Input value={unit} onChange={(e) => setUnit(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <Label>Minimum Order</Label>
+            <Label>{t("Minimum Order")}</Label>
             <Input type="number" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} className="mt-1" min="1" />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" className="rounded-full" onClick={resetForm}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button
             className="rounded-full gradient-primary text-primary-foreground"
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !name || !price}
+            disabled={saveMutation.isPending || !isProductFormValid}
           >
-            {saveMutation.isPending ? "Saving..." : editingId ? "Update Product" : "Add Product"}
+            {saveMutation.isPending ? t("Saving...") : editingId ? t("Update Product") : t("Add Product")}
           </Button>
         </div>
       </div>
