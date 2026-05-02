@@ -1,5 +1,6 @@
 import { useCategories } from "@/hooks/use-products";
 import { Loader2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CategoryGridProps {
   onCategoryClick: (categorySlug: string) => void;
@@ -8,6 +9,7 @@ interface CategoryGridProps {
 
 const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) => {
   const { data: categories, isLoading } = useCategories();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -21,8 +23,8 @@ const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) =>
     return (
       <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg font-heading font-bold">No categories available</p>
-          <p className="text-sm mt-1">Check back soon as new suppliers join the marketplace.</p>
+          <p className="text-lg font-heading font-bold">{t("No categories available")}</p>
+          <p className="text-sm mt-1">{t("Check back soon as new suppliers join the marketplace.")}</p>
         </div>
       </section>
     );
@@ -31,8 +33,8 @@ const CategoryGrid = ({ onCategoryClick, activeCategory }: CategoryGridProps) =>
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
       <div className="mb-5">
-        <span className="text-[10px] font-bold text-accent tracking-widest uppercase">Categories</span>
-        <h2 className="font-heading text-xl font-bold mt-0.5">Health Ecosystem</h2>
+        <span className="text-[10px] font-bold text-accent tracking-widest uppercase">{t("Categories")}</span>
+        <h2 className="font-heading text-xl font-bold mt-0.5">{t("Health Ecosystem")}</h2>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

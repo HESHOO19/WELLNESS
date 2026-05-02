@@ -25,9 +25,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useSupplierSubscriptions } from "@/hooks/use-marketplace";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/wellness_logo.svg";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface HeaderProps {
   onSearch?: (term: string) => void;
@@ -52,6 +54,7 @@ type NotificationProduct = {
 const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
   const { totalItems, clearCart } = useCart();
   const { user, signOut, accountType } = useAuth();
+  const { t, formatNumber } = useLanguage();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -200,7 +203,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
   };
 
   const dashboardHref = isSupplier ? "/supplier" : "/orders";
-  const searchPlaceholder = isSupplier ? "Search your products..." : "Search medicines, vitamins...";
+  const searchPlaceholder = isSupplier ? t("Search your products...") : t("Search medicines, vitamins...");
 
   return (
     <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
@@ -230,7 +233,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
               variant="ghost"
               className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full"
               onClick={runGlobalSearch}
-              aria-label="Search"
+              aria-label={t("Search")}
             >
               <Search className="h-4 w-4" />
             </Button>
@@ -238,6 +241,8 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <LanguageSwitcher />
+
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSearchOpen((open) => !open)}>
             {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </Button>
@@ -246,7 +251,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
             <Link to={dashboardHref} className="hidden sm:block">
               <Button variant="outline" size="sm" className="rounded-full">
                 <LayoutDashboard className="h-4 w-4 mr-2" />
-                Dashboard
+                {t("Dashboard")}
               </Button>
             </Link>
           )}
@@ -261,7 +266,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
               <ShoppingCart className="h-5 w-5" />
               {totalItems > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full gradient-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                  {totalItems}
+                    {formatNumber(totalItems)}
                 </span>
               )}
             </Button>
@@ -274,85 +279,85 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
                   <Bell className="h-5 w-5" />
                   {notificationCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
-                      {notificationCount > 9 ? "9+" : notificationCount}
+                      {notificationCount > 9 ? "9+" : formatNumber(notificationCount)}
                     </span>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 p-2">
-                <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">Notifications</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">{t("Notifications")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
                 {isBuyer ? (
                   <div className="space-y-2">
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Pending Orders</div>
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">{t("Pending Orders")}</div>
                     {buyerPendingOrders.length ? (
                       buyerPendingOrders.map((order) => (
                         <DropdownMenuItem key={order.id} onSelect={() => navigate("/orders")}>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
                             <span className="text-[10px] text-muted-foreground">
-                              Waiting for {order.supplier_name ?? "supplier"}
+                              {t("Waiting for")} {order.supplier_name ?? t("supplier")}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No pending orders.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">{t("No pending orders.")}</div>
                     )}
 
                     <DropdownMenuSeparator />
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">Supplier Updates</div>
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">{t("Supplier Updates")}</div>
                     {buyerActiveOrders.length ? (
                       buyerActiveOrders.map((order) => (
                         <DropdownMenuItem key={order.id} onSelect={() => navigate("/orders")}>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
                             <span className="text-[10px] text-muted-foreground capitalize">
-                              {order.supplier_name ?? "Supplier"} · {order.status}
+                              {order.supplier_name ?? t("Supplier")} · {order.status}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No supplier updates yet.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">{t("No supplier updates yet.")}</div>
                     )}
 
                     <DropdownMenuSeparator />
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Arrivals</div>
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">{t("New Arrivals")}</div>
                     {newArrivalNotifications.length ? (
                       newArrivalNotifications.map((product) => (
                         <DropdownMenuItem key={product.id} onSelect={() => navigate(`/products/${product.id}`)}>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium">{product.name}</span>
                             <span className="text-[10px] text-muted-foreground">
-                              EGP {Number(product.price).toLocaleString()} · {new Date(product.created_at).toLocaleDateString()}
+                              EGP {formatNumber(Number(product.price))} · {new Date(product.created_at).toLocaleDateString()}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
                       <div className="px-2 pb-1 text-xs text-muted-foreground">
-                        Subscribe to suppliers to see tailored new arrivals.
+                        {t("Subscribe to suppliers to see tailored new arrivals.")}
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">New Order Requests</div>
+                    <div className="px-2 pt-1 text-[11px] font-semibold text-muted-foreground">{t("New Order Requests")}</div>
                     {supplierPendingOrders.length ? (
                       supplierPendingOrders.map((order) => (
                         <DropdownMenuItem key={order.id} onSelect={() => navigate("/supplier?tab=orders")}>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium">Order #{order.id.slice(0, 8)}</span>
                             <span className="text-[10px] text-muted-foreground">
-                              Review payment and fulfilment details
+                              {t("Review payment and fulfilment details")}
                             </span>
                           </div>
                         </DropdownMenuItem>
                       ))
                     ) : (
-                      <div className="px-2 pb-1 text-xs text-muted-foreground">No new order requests.</div>
+                      <div className="px-2 pb-1 text-xs text-muted-foreground">{t("No new order requests.")}</div>
                     )}
                   </div>
                 )}
@@ -375,7 +380,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
                   <DropdownMenuItem className="text-xs text-muted-foreground cursor-default capitalize">
                     <span className="flex items-center gap-1">
                       {isSupplier ? <Store className="h-3 w-3" /> : <ShoppingBag className="h-3 w-3" />}
-                      {accountType} account
+                      {accountType} {t("account")}
                     </span>
                   </DropdownMenuItem>
                 )}
@@ -384,39 +389,39 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
                 {isSupplier ? (
                   <>
                     <DropdownMenuItem onClick={() => navigate("/supplier")}>
-                      <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> {t("Dashboard")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/supplier?tab=products")}>
-                      <Store className="h-4 w-4 mr-2" /> My Products
+                      <Store className="h-4 w-4 mr-2" /> {t("My Products")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/supplier?tab=orders")}>
-                      <ShoppingBag className="h-4 w-4 mr-2" /> My Orders
+                      <ShoppingBag className="h-4 w-4 mr-2" /> {t("My Orders")}
                     </DropdownMenuItem>
                   </>
                 ) : (
                   <>
                     <DropdownMenuItem onClick={() => navigate("/orders")}>
-                      <LayoutDashboard className="h-4 w-4 mr-2" /> Dashboard
+                      <LayoutDashboard className="h-4 w-4 mr-2" /> {t("Dashboard")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/suppliers")}>
-                      <Users className="h-4 w-4 mr-2" /> Suppliers
+                      <Users className="h-4 w-4 mr-2" /> {t("Suppliers")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/shop")}>
-                      <ShoppingBag className="h-4 w-4 mr-2" /> Browse Products
+                      <ShoppingBag className="h-4 w-4 mr-2" /> {t("Browse Products")}
                     </DropdownMenuItem>
                   </>
                 )}
 
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4 mr-2" /> Sign out
+                  <LogOut className="h-4 w-4 mr-2" /> {t("Sign out")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Link to="/auth">
               <Button variant="default" size="sm" className="rounded-full font-bold">
-                Sign in
+                {t("Sign in")}
               </Button>
             </Link>
           )}
@@ -441,7 +446,7 @@ const Header = ({ onSearch, onCartOpen }: HeaderProps) => {
               autoFocus
             />
             <Button type="button" variant="outline" className="rounded-full" onClick={runGlobalSearch}>
-              Search
+              {t("Search")}
             </Button>
           </div>
         </div>

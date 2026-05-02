@@ -4,6 +4,7 @@ import ProductCard from "./ProductCard";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { Product } from "@/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ProductGridProps {
   categoryFilter?: string;
@@ -30,6 +31,7 @@ const ProductGrid = ({
 }: ProductGridProps) => {
   const [page, setPage] = useState(0);
   const { data: products, isLoading } = useProducts();
+  const { t } = useLanguage();
 
   const filtered = useMemo(() => {
     const source = providedProducts ?? (products ?? []).map((product) => {
@@ -89,7 +91,7 @@ const ProductGrid = ({
     <section className="max-w-6xl mx-auto px-4 md:px-6 mt-10">
       <div className="flex items-end justify-between mb-5">
         <div>
-          <span className="text-[10px] font-bold text-accent tracking-widest uppercase">Curated</span>
+          <span className="text-[10px] font-bold text-accent tracking-widest uppercase">{t("Curated")}</span>
           <h2 className="font-heading text-xl font-bold mt-0.5">{title}</h2>
         </div>
         {maxPage > 0 && (
@@ -106,8 +108,8 @@ const ProductGrid = ({
 
       {visible.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg font-heading font-bold">{emptyTitle}</p>
-          <p className="text-sm mt-1">{emptyDescription}</p>
+          <p className="text-lg font-heading font-bold">{t(emptyTitle)}</p>
+          <p className="text-sm mt-1">{t(emptyDescription)}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

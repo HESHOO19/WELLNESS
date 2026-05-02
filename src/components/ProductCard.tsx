@@ -4,6 +4,7 @@ import type { Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ProductCardProps {
   product: Product;
@@ -15,13 +16,14 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
   const { addToCart } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { t, formatNumber } = useLanguage();
   const isSupplierView = role === "supplier";
 
   const handleAdd = () => {
     addToCart(product, product.min_order);
     toast({
-      title: "Added to cart",
-      description: `${product.name} x ${product.min_order} ${product.unit}s`,
+      title: t("Added to cart"),
+      description: `${product.name} x ${formatNumber(product.min_order)} ${product.unit}s`,
     });
   };
 
@@ -31,7 +33,7 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
 
   const categoryLabel = product.category
     ? product.category.charAt(0).toUpperCase() + product.category.slice(1)
-    : "General";
+    : t("General");
 
   return (
     <div
@@ -69,7 +71,7 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
             <p className="text-muted-foreground text-xs mt-1 line-clamp-2">{product.description}</p>
             {product.supplier_name && (
               <p className="text-[11px] text-muted-foreground mt-2">
-                Supplier: <span className="font-medium text-foreground">{product.supplier_name}</span>
+                {t("Supplier")}: <span className="font-medium text-foreground">{product.supplier_name}</span>
               </p>
             )}
           </div>
@@ -77,10 +79,10 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
           <div className="flex items-end justify-between mt-2 gap-2">
             <div>
               <span className="text-lg font-extrabold font-heading text-foreground">
-                EGP {product.price.toLocaleString()}
+                EGP {formatNumber(product.price)}
               </span>
               <span className="text-muted-foreground text-[10px] block">
-                Min. {product.min_order} {product.unit}s
+                {t("Minimum Order")} {formatNumber(product.min_order)} {product.unit}s
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -88,12 +90,12 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
                 {isSupplierView ? (
                   <>
                     <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                    Insights
+                    {t("Insights")}
                   </>
                 ) : (
                   <>
                     <Eye className="h-3.5 w-3.5 mr-1" />
-                    Details
+                    {t("Details")}
                   </>
                 )}
               </Button>
@@ -115,7 +117,7 @@ const ProductCard = ({ product, index = 0, role = "guest" }: ProductCardProps) =
       <div className="px-4 pb-3">
         <div className="flex items-center gap-1.5 text-[10px]">
           <Package className="h-3 w-3 text-success" />
-          <span className="text-success font-medium">{product.stock} in stock</span>
+          <span className="text-success font-medium">{formatNumber(product.stock)} {t("In stock")}</span>
         </div>
       </div>
     </div>

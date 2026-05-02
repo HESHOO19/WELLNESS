@@ -17,6 +17,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   useFavoriteProducts,
   useSupplierSubscriptions,
@@ -49,6 +50,7 @@ const BuyerOrders = () => {
   const { user, loading, accountType } = useAuth();
   const navigate = useNavigate();
   const [range, setRange] = useState<DashboardRange>("14d");
+  const { t, formatNumber } = useLanguage();
   const { data: favorites = [] } = useFavoriteProducts(user?.id, !!user && accountType === "buyer");
   const { data: subscriptions = [] } = useSupplierSubscriptions(user?.id, !!user && accountType === "buyer");
 
@@ -98,17 +100,17 @@ const BuyerOrders = () => {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-primary">Buyer Workspace</p>
-              <h1 className="font-heading text-3xl font-extrabold mt-2">Dashboard</h1>
+              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-primary">{t("Buyer Workspace")}</p>
+              <h1 className="font-heading text-3xl font-extrabold mt-2">{t("Dashboard")}</h1>
               <p className="text-muted-foreground text-sm mt-2">
-                Track orders, watch supplier confirmations, and keep your subscriptions and favorites close by.
+                {t("Track orders, watch supplier confirmations, and keep your subscriptions and favorites close by.")}
               </p>
             </div>
             <div className="min-w-[190px]">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2">Time Range</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2">{t("Time Range")}</p>
               <Select value={range} onValueChange={(value) => setRange(value as DashboardRange)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select range" />
+                  <SelectValue placeholder={t("Select range")} />
                 </SelectTrigger>
                 <SelectContent>
                   {dashboardRangeOptions.map((option) => (
@@ -124,19 +126,19 @@ const BuyerOrders = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="glass-card-elevated rounded-2xl p-5">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Orders</p>
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Total Orders")}</p>
             <p className="font-heading text-2xl font-extrabold mt-1">{visibleOrders.length}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Spent</p>
-            <p className="font-heading text-2xl font-extrabold mt-1">EGP {totalSpent.toLocaleString()}</p>
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Total Spent")}</p>
+            <p className="font-heading text-2xl font-extrabold mt-1">EGP {formatNumber(totalSpent)}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Subscriptions</p>
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Subscriptions")}</p>
             <p className="font-heading text-2xl font-extrabold mt-1">{subscriptions.length}</p>
           </div>
           <div className="glass-card-elevated rounded-2xl p-5">
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Favorites</p>
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Favorites")}</p>
             <p className="font-heading text-2xl font-extrabold mt-1">{favorites.length}</p>
           </div>
         </div>
@@ -145,35 +147,35 @@ const BuyerOrders = () => {
           <section className="glass-card-elevated rounded-3xl p-6">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              <h2 className="font-heading text-xl font-bold">Supplier Subscriptions</h2>
+              <h2 className="font-heading text-xl font-bold">{t("Supplier Subscriptions")}</h2>
             </div>
             <p className="text-sm text-muted-foreground mt-3">
-              Follow suppliers to tailor your new-arrivals feed around the catalogs you care about most.
+              {t("Follow suppliers to tailor your new-arrivals feed around the catalogs you care about most.")}
             </p>
             <div className="space-y-3 mt-5">
               <div className="rounded-2xl border border-border p-4">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Active subscriptions</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{t("Active subscriptions")}</p>
                 <p className="font-heading text-3xl font-extrabold mt-2">{subscriptions.length}</p>
               </div>
               <div className="rounded-2xl border border-border p-4">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Pending orders</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{t("Pending orders")}</p>
                 <p className="font-heading text-3xl font-extrabold mt-2">{pendingOrders.length}</p>
               </div>
             </div>
             <Button className="rounded-full mt-5" onClick={() => navigate("/suppliers")}>
               <Store className="h-4 w-4 mr-2" />
-              Browse Suppliers
+              {t("Browse Suppliers")}
             </Button>
           </section>
 
           <section className="glass-card-elevated rounded-3xl p-6">
             <div className="flex items-center gap-2">
               <Heart className="h-5 w-5 text-primary" />
-              <h2 className="font-heading text-xl font-bold">Favorites</h2>
+              <h2 className="font-heading text-xl font-bold">{t("Favorites")}</h2>
             </div>
             {favoriteProducts.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border p-8 text-muted-foreground mt-5">
-                Favorite products from product detail pages to keep quick access to them here.
+                {t("Favorite products from product detail pages to keep quick access to them here.")}
               </div>
             ) : (
               <div className="space-y-3 mt-5">
@@ -185,7 +187,7 @@ const BuyerOrders = () => {
                     className="w-full text-left rounded-2xl border border-border px-4 py-3 hover:border-primary/40 transition-colors"
                   >
                     <p className="font-medium">{product!.name}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Open product details</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t("Open product details")}</p>
                   </button>
                 ))}
               </div>
@@ -200,12 +202,12 @@ const BuyerOrders = () => {
         ) : visibleOrders.length === 0 ? (
           <div className="glass-card rounded-3xl p-12 text-center">
             <ShoppingBag className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="font-heading font-bold text-lg mb-1">No orders in this range</h3>
+            <h3 className="font-heading font-bold text-lg mb-1">{t("No orders in this range")}</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Try a wider range or place new orders to see dashboard activity here.
+              {t("Try a wider range or place new orders to see dashboard activity here.")}
             </p>
             <Button onClick={() => navigate("/shop")} variant="hero" className="rounded-full">
-              Browse Catalog
+              {t("Browse Catalog")}
             </Button>
           </div>
         ) : (
@@ -213,7 +215,7 @@ const BuyerOrders = () => {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <Clock className="h-4 w-4 text-yellow-600" />
-                <h2 className="font-heading font-bold text-lg">Pending Supplier Confirmations</h2>
+                <h2 className="font-heading font-bold text-lg">{t("Pending Supplier Confirmations")}</h2>
               </div>
               {pendingOrders.length ? (
                 <div className="space-y-3">
@@ -222,18 +224,18 @@ const BuyerOrders = () => {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-bold text-sm">Order #{order.id.slice(0, 8)}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Waiting for {order.supplier_name ?? "supplier"} to confirm
+                            <p className="text-sm text-muted-foreground mt-1">
+                            {t("Waiting for")} {order.supplier_name ?? t("supplier")} {t("to confirm")}
                           </p>
                         </div>
-                        <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
+                        <p className="font-heading font-extrabold">EGP {formatNumber(Number(order.total))}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                  No pending confirmations right now.
+                  {t("No pending confirmations right now.")}
                 </div>
               )}
             </section>
@@ -241,7 +243,7 @@ const BuyerOrders = () => {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                <h2 className="font-heading font-bold text-lg">Active Orders</h2>
+                <h2 className="font-heading font-bold text-lg">{t("Active Orders")}</h2>
               </div>
               {activeOrders.length ? (
                 <div className="space-y-3">
@@ -259,10 +261,10 @@ const BuyerOrders = () => {
                               </span>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">
-                              Supplier: {order.supplier_name ?? "Wellness supplier"}
+                              {t("Supplier")}: {order.supplier_name ?? t("supplier")}
                             </p>
                           </div>
-                          <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
+                          <p className="font-heading font-extrabold">EGP {formatNumber(Number(order.total))}</p>
                         </div>
                       </div>
                     );
@@ -278,7 +280,7 @@ const BuyerOrders = () => {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <ShoppingBag className="h-4 w-4 text-primary" />
-                <h2 className="font-heading font-bold text-lg">All Orders</h2>
+                <h2 className="font-heading font-bold text-lg">{t("All Orders")}</h2>
               </div>
               <div className="space-y-3">
                 {visibleOrders.map((order) => {
@@ -295,13 +297,13 @@ const BuyerOrders = () => {
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {new Date(order.created_at).toLocaleDateString()} · {order.payment_method === "cod" ? "Cash on Delivery" : "Online Payment"}
+                            {new Date(order.created_at).toLocaleDateString()} · {order.payment_method === "cod" ? t("Cash on Delivery") : t("Online Payment")}
                           </p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Supplier: {order.supplier_name ?? "Wellness supplier"}
+                            {t("Supplier")}: {order.supplier_name ?? t("supplier")}
                           </p>
                         </div>
-                        <p className="font-heading font-extrabold">EGP {Number(order.total).toLocaleString()}</p>
+                        <p className="font-heading font-extrabold">EGP {formatNumber(Number(order.total))}</p>
                       </div>
 
                       <div className="space-y-2 border-t border-border pt-3">
@@ -321,8 +323,8 @@ const BuyerOrders = () => {
                                 </div>
                               )}
                             </div>
-                            <span className="flex-grow truncate">{item.products?.name ?? "Product"} x {item.quantity}</span>
-                            <span className="font-bold text-xs">EGP {(Number(item.unit_price) * item.quantity).toLocaleString()}</span>
+                            <span className="flex-grow truncate">{item.products?.name ?? t("Product")} x {item.quantity}</span>
+                            <span className="font-bold text-xs">EGP {formatNumber(Number(item.unit_price) * item.quantity)}</span>
                           </button>
                         ))}
                       </div>

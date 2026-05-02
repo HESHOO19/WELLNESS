@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ImageUploadProps {
   value: string;
@@ -13,17 +14,18 @@ interface ImageUploadProps {
 const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   const handleFile = async (file: File) => {
     if (!user) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please select an image.", variant: "destructive" });
+      toast({ title: t("Invalid file"), description: t("Please select an image."), variant: "destructive" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Max size is 5MB.", variant: "destructive" });
+      toast({ title: t("File too large"), description: t("Max size is 5MB."), variant: "destructive" });
       return;
     }
 
@@ -38,10 +40,10 @@ const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
       if (error) throw error;
       const { data } = supabase.storage.from("product-images").getPublicUrl(path);
       onChange(data.publicUrl);
-      toast({ title: "Image uploaded" });
+      toast({ title: t("Image uploaded") });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Upload failed.";
-      toast({ title: "Upload failed", description: message, variant: "destructive" });
+      toast({ title: t("Upload failed"), description: message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -83,14 +85,14 @@ const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
           ) : (
             <>
               <ImageIcon className="h-6 w-6" />
-              <span className="text-xs font-medium">Upload image</span>
+              <span className="text-xs font-medium">{t("Upload image")}</span>
             </>
           )}
         </button>
       )}
       {value && (
         <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={uploading} className="rounded-full">
-          <Upload className="h-3 w-3 mr-1" /> Replace
+          <Upload className="h-3 w-3 mr-1" /> {t("Replace")}
         </Button>
       )}
     </div>

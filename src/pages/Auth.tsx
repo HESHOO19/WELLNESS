@@ -16,12 +16,15 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Store, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import logo from "@/assets/wellness_logo.svg";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, accountType, refreshAccountType } = useAuth();
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -78,9 +81,9 @@ const Auth = () => {
     });
     setLoading(false);
     if (error) {
-      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
+      toast({ title: t("Sign in failed"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Welcome back!" });
+      toast({ title: t("Welcome back!") });
       navigate("/");
     }
   };
@@ -98,9 +101,9 @@ const Auth = () => {
     });
     setLoading(false);
     if (error) {
-      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+      toast({ title: t("Registration failed"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email", description: "We sent a verification link to confirm your account." });
+      toast({ title: t("Check your email"), description: t("We sent a verification link to confirm your account.") });
     }
   };
 
@@ -115,7 +118,7 @@ const Auth = () => {
       },
     });
     if (error) {
-      toast({ title: "Google sign in failed", description: error.message, variant: "destructive" });
+      toast({ title: t("Google sign in failed"), description: error.message, variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -144,13 +147,13 @@ const Auth = () => {
       await supabase.auth.refreshSession();
       await refreshAccountType(user.id);
 
-      toast({ title: "Account type saved", description: `Registered as ${googleAccountType}.` });
+      toast({ title: t("Account type saved"), description: `${t("Registered as")} ${t(googleAccountType === "supplier" ? "Supplier" : "Buyer")}.` });
       setShowAccountTypeModal(false);
       localStorage.removeItem("preferred_account_type");
       navigate(googleAccountType === "supplier" ? "/supplier" : "/orders");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unable to save account type.";
-      toast({ title: "Failed to save", description: message, variant: "destructive" });
+      const message = err instanceof Error ? err.message : t("Unable to save account type.");
+      toast({ title: t("Failed to save"), description: message, variant: "destructive" });
     } finally {
       setSavingAccountType(false);
     }
@@ -158,13 +161,16 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="absolute top-4 right-4 z-10">
+        <LanguageSwitcher />
+      </div>
       {/* Google OAuth account-type modal for new users */}
       <Dialog open={showAccountTypeModal} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle className="font-heading text-xl font-extrabold">One more step</DialogTitle>
+            <DialogTitle className="font-heading text-xl font-extrabold">{t("One more step")}</DialogTitle>
             <DialogDescription>
-              Tell us how you'll use Wellness so we can set up your account correctly.
+              {t("Tell us how you'll use Wellness so we can set up your account correctly.")}
             </DialogDescription>
           </DialogHeader>
           <RadioGroup
@@ -176,7 +182,7 @@ const Auth = () => {
               <RadioGroupItem value="buyer" id="g-buyer" className="sr-only" />
               <ShoppingBag className={`h-6 w-6 ${googleAccountType === "buyer" ? "text-primary" : "text-muted-foreground"}`} />
               <div className="text-center">
-                <p className="font-bold text-sm">Buyer</p>
+                <p className="font-bold text-sm">{t("Buyer")}</p>
                 <p className="text-muted-foreground text-[10px] leading-tight">Pharmacy or retailer ordering products</p>
               </div>
             </label>
@@ -184,7 +190,7 @@ const Auth = () => {
               <RadioGroupItem value="supplier" id="g-supplier" className="sr-only" />
               <Store className={`h-6 w-6 ${googleAccountType === "supplier" ? "text-primary" : "text-muted-foreground"}`} />
               <div className="text-center">
-                <p className="font-bold text-sm">Supplier</p>
+                <p className="font-bold text-sm">{t("Supplier")}</p>
                 <p className="text-muted-foreground text-[10px] leading-tight">Distributor or manufacturer listing products</p>
               </div>
             </label>
@@ -195,15 +201,15 @@ const Auth = () => {
             disabled={savingAccountType}
           >
             {savingAccountType
-              ? "Saving..."
-              : `Continue as ${googleAccountType === "supplier" ? "Supplier" : "Buyer"}`}
+              ? t("Saving...")
+              : `${t("Continue as")} ${t(googleAccountType === "supplier" ? "Supplier" : "Buyer")}`}
           </Button>
         </DialogContent>
       </Dialog>
 
       <div className="w-full max-w-md">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to home
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-6 transition-colors">
+          <ArrowLeft className="h-4 w-4" /> {t("Back to home")}
         </Link>
 
         <div className="glass-card-elevated rounded-2xl p-8">
@@ -223,32 +229,32 @@ const Auth = () => {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Continue with Google
+            {t("Continue with Google")}
           </Button>
 
           <div className="relative mb-4">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">{t("or")}</span></div>
           </div>
 
           <Tabs defaultValue="login">
             <TabsList className="w-full mb-6">
-              <TabsTrigger value="login" className="flex-1">Sign In</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1">Register</TabsTrigger>
+              <TabsTrigger value="login" className="flex-1">{t("Sign In")}</TabsTrigger>
+              <TabsTrigger value="register" className="flex-1">{t("Register")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-email">{t("Email")}</Label>
                   <Input id="login-email" type="email" placeholder="you@business.eg" required className="mt-1" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                 </div>
                 <div>
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password">{t("Password")}</Label>
                   <Input id="login-password" type="password" placeholder="••••••••" required className="mt-1" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
                 </div>
                 <Button type="submit" className="w-full rounded-full gradient-primary text-primary-foreground font-bold" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign In"}
+                  {loading ? t("Signing in...") : t("Sign In")}
                 </Button>
               </form>
             </TabsContent>
@@ -256,7 +262,7 @@ const Auth = () => {
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
-                  <Label className="text-sm font-bold mb-2 block">I am a</Label>
+                  <Label className="text-sm font-bold mb-2 block">{t("I am a")}</Label>
                   <RadioGroup
                     value={registrationAccountType}
                     onValueChange={(v) => setRegistrationAccountType(v as "buyer" | "supplier")}
@@ -266,7 +272,7 @@ const Auth = () => {
                       <RadioGroupItem value="buyer" id="buyer" className="sr-only" />
                       <ShoppingBag className={`h-6 w-6 ${registrationAccountType === "buyer" ? "text-primary" : "text-muted-foreground"}`} />
                       <div className="text-center">
-                        <p className="font-bold text-sm">Buyer</p>
+                        <p className="font-bold text-sm">{t("Buyer")}</p>
                         <p className="text-muted-foreground text-[10px] leading-tight">Pharmacy or retailer ordering products</p>
                       </div>
                     </label>
@@ -274,7 +280,7 @@ const Auth = () => {
                       <RadioGroupItem value="supplier" id="supplier" className="sr-only" />
                       <Store className={`h-6 w-6 ${registrationAccountType === "supplier" ? "text-primary" : "text-muted-foreground"}`} />
                       <div className="text-center">
-                        <p className="font-bold text-sm">Supplier</p>
+                        <p className="font-bold text-sm">{t("Supplier")}</p>
                         <p className="text-muted-foreground text-[10px] leading-tight">Distributor or manufacturer listing products</p>
                       </div>
                     </label>
@@ -282,23 +288,23 @@ const Auth = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="reg-name">Business Name</Label>
+                  <Label htmlFor="reg-name">{t("Business Name")}</Label>
                   <Input id="reg-name" placeholder={registrationAccountType === "supplier" ? "Your Company" : "Your Pharmacy"} required className="mt-1" value={regName} onChange={e => setRegName(e.target.value)} />
                 </div>
                 <div>
-                  <Label htmlFor="reg-email">Email</Label>
+                  <Label htmlFor="reg-email">{t("Email")}</Label>
                   <Input id="reg-email" type="email" placeholder="you@business.eg" required className="mt-1" value={regEmail} onChange={e => setRegEmail(e.target.value)} />
                 </div>
                 <div>
-                  <Label htmlFor="reg-password">Password</Label>
+                  <Label htmlFor="reg-password">{t("Password")}</Label>
                   <Input id="reg-password" type="password" placeholder="••••••••" required className="mt-1" minLength={8} value={regPassword} onChange={e => setRegPassword(e.target.value)} />
                 </div>
                 <div>
-                  <Label htmlFor="reg-phone">Phone</Label>
+                  <Label htmlFor="reg-phone">{t("Phone")}</Label>
                   <Input id="reg-phone" type="tel" placeholder="+20 XXX XXX XXXX" required className="mt-1" value={regPhone} onChange={e => setRegPhone(e.target.value)} />
                 </div>
                 <Button type="submit" className="w-full rounded-full gradient-primary text-primary-foreground font-bold" disabled={loading}>
-                  {loading ? "Creating account..." : `Register as ${registrationAccountType === "supplier" ? "Supplier" : "Buyer"}`}
+                  {loading ? t("Creating account...") : `${t("Register as")} ${t(registrationAccountType === "supplier" ? "Supplier" : "Buyer")}`}
                 </Button>
               </form>
             </TabsContent>

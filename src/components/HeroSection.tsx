@@ -2,20 +2,22 @@ import { useNavigate } from "react-router-dom";
 import { LayoutDashboard, PackageSearch, ShoppingBag, Store, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import heroBg from "@/assets/hero-bg.jpg";
 
 const HeroSection = () => {
   const navigate = useNavigate();
   const { user, accountType } = useAuth();
+  const { t } = useLanguage();
   const isSupplier = accountType === "supplier";
   const isBuyer = accountType === "buyer";
 
   const title = isSupplier
-    ? "Run Your Supplier Operation From One Screen"
-    : "Egypt's 1st B2B Online Pharmaceutical Platform";
+    ? t("Run Your Supplier Operation From One Screen")
+    : t("Egypt's 1st B2B Online Pharmaceutical Platform");
   const description = isSupplier
-    ? "Track demand, inspect product performance, manage orders, and update your listings without leaving your workflow."
-    : "Wholesale pharmaceutical solutions with competitive pricing, verified products, and seamless ordering for pharmacies across Egypt.";
+    ? t("Track demand, inspect product performance, manage orders, and update your listings without leaving your workflow.")
+    : t("Wholesale pharmaceutical solutions with competitive pricing, verified products, and seamless ordering for pharmacies across Egypt.");
 
   return (
     <section className="relative overflow-hidden">
@@ -34,7 +36,7 @@ const HeroSection = () => {
         <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-1.5 rounded-full mb-5">
           <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="text-[11px] font-bold tracking-wider text-primary uppercase">
-            {isSupplier ? "Supplier Operations" : "Trusted B2B Platform"}
+            {isSupplier ? t("Supplier Operations") : t("Trusted B2B Platform")}
           </span>
         </div>
 
@@ -50,7 +52,7 @@ const HeroSection = () => {
           {user && (
             <Button variant="hero" size="lg" onClick={() => navigate(isSupplier ? "/supplier" : "/orders")}>
               <LayoutDashboard className="h-4 w-4 mr-2" />
-              Dashboard
+              {t("Dashboard")}
             </Button>
           )}
 
@@ -58,22 +60,22 @@ const HeroSection = () => {
             <>
               <Button variant="hero-outline" size="lg" onClick={() => navigate("/supplier?tab=products")}>
                 <PackageSearch className="h-4 w-4 mr-2" />
-                My Products
+                {t("My Products")}
               </Button>
               <Button variant="hero-outline" size="lg" onClick={() => navigate("/supplier?tab=orders")}>
                 <ShoppingBag className="h-4 w-4 mr-2" />
-                My Orders
+                {t("My Orders")}
               </Button>
             </>
           ) : (
             <>
               <Button variant={user ? "hero-outline" : "hero"} size="lg" onClick={() => navigate("/shop")}>
                 <Store className="h-4 w-4 mr-2" />
-                Browse Catalog
+                {t("Browse Catalog")}
               </Button>
               <Button variant="hero-outline" size="lg" onClick={() => navigate(isBuyer ? "/suppliers" : "/auth")}>
                 <Users className="h-4 w-4 mr-2" />
-                {isBuyer ? "Suppliers" : "Join Wellness"}
+                {isBuyer ? t("Suppliers") : t("Join Wellness")}
               </Button>
             </>
           )}
@@ -81,10 +83,10 @@ const HeroSection = () => {
 
         <div className="flex flex-wrap gap-6 mt-10 text-muted-foreground text-xs font-medium">
           {[
-            { icon: "Secure", label: "Protected ordering" },
-            { icon: "Live", label: "Live stock visibility" },
-            { icon: "Fast", label: "Supplier-first fulfilment" },
-            { icon: "Insight", label: "Actionable demand signals" },
+            { icon: "Secure", label: t("Protected ordering") },
+            { icon: "Live", label: t("Live stock visibility") },
+            { icon: "Fast", label: t("Supplier-first fulfilment") },
+            { icon: "Insight", label: t("Actionable demand signals") },
           ].map((badge) => (
             <div key={badge.label} className="flex items-center gap-2">
               <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-[10px] font-bold uppercase">
