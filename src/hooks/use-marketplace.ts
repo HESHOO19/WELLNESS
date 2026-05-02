@@ -4,6 +4,24 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Product } from "@/types";
 
+export const getSupabaseErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const err = error as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof err.message === "string") parts.push(err.message);
+    if (typeof err.details === "string") parts.push(err.details);
+    if (typeof err.hint === "string") parts.push(err.hint);
+    if (typeof err.code === "string") parts.push(`(${err.code})`);
+    return parts.filter(Boolean).join(" — ") || "An unexpected Supabase error occurred.";
+  }
+  return "An unexpected Supabase error occurred.";
+};
+
+export const logSupabaseError = (error: unknown) => {
+  console.error("[Wellness] Supabase error:", error);
+};
+
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 type FavoriteRow = Database["public"]["Tables"]["favorite_products"]["Row"];
 type NewsletterRow = Database["public"]["Tables"]["newsletter_subscriptions"]["Row"];

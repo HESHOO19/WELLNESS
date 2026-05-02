@@ -27,6 +27,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useCategories } from "@/hooks/use-products";
 import {
   getProductMetrics,
+  getSupabaseErrorMessage,
+  logSupabaseError,
   useSupplierOrders,
   useSupplierProducts,
 } from "@/hooks/use-marketplace";
@@ -126,13 +128,8 @@ const SupplierDashboard = () => {
   };
 
   const getErrorMessage = (error: unknown) => {
-    if (error instanceof Error) return error.message;
-    if (typeof error === "object" && error !== null) {
-      const err = error as Record<string, unknown>;
-      if (typeof err.message === "string") return err.message;
-      if (typeof err.error === "string") return err.error;
-    }
-    return t("Unable to save product.");
+    logSupabaseError(error);
+    return getSupabaseErrorMessage(error) || t("Unable to save product.");
   };
 
   const normalizedImageUrls = imageUrls.map((url) => url.trim()).filter(Boolean);
@@ -222,7 +219,8 @@ const SupplierDashboard = () => {
       toast({ title: t("Product deleted") });
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : t("Unable to delete product.");
+      logSupabaseError(error);
+      const message = getSupabaseErrorMessage(error) || t("Unable to delete product.");
       toast({ title: t("Delete failed"), description: message, variant: "destructive" });
     },
   });
@@ -244,7 +242,8 @@ const SupplierDashboard = () => {
       }
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : t("Unable to update order status.");
+      logSupabaseError(error);
+      const message = getSupabaseErrorMessage(error) || t("Unable to update order status.");
       toast({ title: t("Update failed"), description: message, variant: "destructive" });
     },
   });
