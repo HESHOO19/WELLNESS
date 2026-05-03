@@ -15,7 +15,6 @@ FROM public.profiles
 WHERE account_type IN ('buyer', 'supplier')
 ON CONFLICT (user_id) DO NOTHING;
 
--- Ensure account type lookups work consistently for current product policies.
 CREATE OR REPLACE FUNCTION public.get_account_type(_user_id uuid)
 RETURNS public.account_type
 LANGUAGE sql
@@ -23,8 +22,5 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT COALESCE(p.account_type, r.role)
-  FROM public.profiles p
-  LEFT JOIN public.user_roles r ON r.user_id = _user_id
-  WHERE p.id = _user_id
+  SELECT account_type FROM public.profiles WHERE id = _user_id
 $$;
